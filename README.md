@@ -16,7 +16,11 @@ the highest total wins the day.
 - Miss a day and you owe that song. Late songs go in oldest day first, and each one
   belongs to the day it was missed.
 
-Coming in later updates: tiebreak rounds, themes, the schedule tab and stats.
+- A tie for the top starts a tiebreak: the tied players each send another song and only
+  the other players rate them. If everyone tied, the round repeats with everyone. Tiebreaks
+  repeat until there's one winner.
+
+Coming in later updates: themes, the schedule tab and stats.
 
 ## Stack
 
@@ -28,8 +32,7 @@ Coming in later updates: tiebreak rounds, themes, the schedule tab and stats.
 ## Setup
 
 1. **Supabase.** Create a free project, then run
-   [`supabase/migrations/20261114000000_core_game.sql`](supabase/migrations/20261114000000_core_game.sql)
-   in the SQL editor.
+   each file in [`supabase/migrations`](supabase/migrations) in the SQL editor, oldest first.
 2. **Google sign-in.** In Supabase, go to Authentication > Sign In / Providers > Google and
    follow the steps there to create a Google OAuth client. Under Authentication > URL
    Configuration, set the Site URL to your site's address and add
