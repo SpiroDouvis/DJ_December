@@ -12,6 +12,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
         </Link>
         <nav>
           <Link href="/">Today</Link>
+          <Link href="/schedule">Schedule</Link>
           {me.is_admin ? <Link href="/admin">Admin</Link> : null}
         </nav>
         <div className="me">

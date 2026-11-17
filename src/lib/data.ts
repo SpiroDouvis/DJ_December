@@ -5,6 +5,7 @@ import { authClient, dataClient } from "./supabase/server";
 import { adminEmails } from "./supabase/env";
 import type { Player, Rating, Submission } from "./game";
 import type { Service } from "./music";
+import { availabilityKey, type Availability } from "./schedule";
 import { datesNeedingDraw, drawTheme, type DayThemeRow, type ThemeRow } from "./themes";
 import { gameDateOf, openDates, seasonFromEnv, type GameDate, type Season } from "./time";
 
@@ -84,6 +85,8 @@ export type Game = {
   /** Every saved day theme, including future ones an admin set. Not for players' eyes. */
   dayThemeRows: Map<GameDate, DayThemeRow>;
   themePool: ThemeRow[];
+  /** Keyed by availabilityKey(playerId, date). */
+  availability: Map<string, Availability>;
 };
 
 async function loadDayThemes(): Promise<Map<GameDate, DayThemeRow>> {
@@ -127,15 +130,17 @@ async function drawDueThemes(
 /** Everything in the game. A season is at most a few thousand rows, so we load it all. */
 export async function loadGame(): Promise<Game> {
   const db = dataClient();
-  const [players, submissions, ratings, songs, pool, savedThemes] = await Promise.all([
+  const [players, submissions, ratings, songs, pool, savedThemes, availability] = await Promise.all([
     db.from("players").select("*").order("display_name"),
     db.from("submissions").select("id, player_id, game_date, round, song_id"),
     db.from("ratings").select("submission_id, rater_id, score"),
     db.from("songs").select("id, title, artist, artwork_url, spotify_url, apple_music_url"),
     db.from("themes").select("id, text").order("text"),
     loadDayThemes(),
+    db.from("availability").select("player_id, game_date, status, note"),
   ]);
   if (pool.error) throw pool.error;
+  if (availability.error) throw availability.error;
   for (const r of [players, submissions, ratings, songs]) if (r.error) throw r.error;
 
   const season = seasonFromEnv();
@@ -156,6 +161,12 @@ export async function loadGame(): Promise<Game> {
     themes,
     dayThemeRows,
     themePool,
+    availability: new Map(
+      availability.data.map((a) => [
+        availabilityKey(a.player_id, a.game_date),
+        { status: a.status, note: a.note },
+      ]),
+    ),
     playerRows,
     players: playerRows.map((p) => ({ id: p.id, name: p.display_name, joinedOn: p.joined_on })),
     submissions: submissions.data!.map((s) => ({

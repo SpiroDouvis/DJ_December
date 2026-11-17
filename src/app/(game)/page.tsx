@@ -21,6 +21,10 @@ export default async function Home() {
           DJ December starts {formatDate(game.season.start)} at 5 AM MST. Each day, send one song and rate
           everyone else&apos;s.
         </p>
+        <p>
+          You can already <Link href="/schedule">queue songs</Link> for days without a theme and mark when
+          you&apos;re free to rate.
+        </p>
       </section>
     );
   }
@@ -32,6 +36,7 @@ export default async function Home() {
   const todaysSong = todays ? game.songs.get(todays.songId) : undefined;
   const todaysRated = todays ? game.ratings.some((r) => r.submissionId === todays.id) : false;
 
+  const queuedCount = game.submissions.filter((s) => s.playerId === me.id && s.date > game.today).length;
   const outcomes = game.open.map((d) => dayOutcome(d, game.players, game.submissions, game.ratings));
   const tiebreaks = owedTiebreaks(me.id, outcomes);
   const pending = outcomes.filter((o) => !o.current.revealed).reverse();
@@ -79,6 +84,12 @@ export default async function Home() {
         ) : (
           <p>You&apos;re all caught up.</p>
         )}
+        <p className="muted">
+          {queuedCount > 0
+            ? `You have ${queuedCount} ${queuedCount === 1 ? "song" : "songs"} queued for later days. `
+            : ""}
+          <Link href="/schedule">Queue songs ahead</Link> for days without a theme.
+        </p>
       </section>
 
       <h2>To rate</h2>

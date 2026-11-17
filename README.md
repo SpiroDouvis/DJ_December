@@ -22,7 +22,11 @@ the highest total wins the day.
 - Every second day has a theme, drawn at random from a pool when the day opens. Admins
   can edit the pool and set, redraw or clear any day's theme on the Admin page.
 
-Coming in later updates: the schedule tab and stats.
+- The Schedule tab lets players queue songs ahead for days without a theme (each goes in
+  when its day opens) and mark when they're free or busy to rate. A busy note shows next
+  to their name when a day is waiting on them.
+
+Coming in a later update: stats.
 
 ## Stack
 

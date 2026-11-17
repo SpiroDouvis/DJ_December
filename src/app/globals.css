@@ -99,3 +99,12 @@ summary { cursor: pointer; color: var(--muted); }
 .pool li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .inline { display: inline-flex; gap: 6px; align-items: center; margin: 2px 4px 2px 0; }
 .inline input { padding: 4px 8px; width: 180px; }
+.queue { display: grid; gap: 12px; }
+.queue-row { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.queue-date { display: grid; align-content: start; }
+.queue-body .song { max-width: 420px; }
+.queue-body p { margin: 4px 0; }
+.avail.available { color: var(--accent-2); }
+.avail.busy { color: var(--warn); }
+.inline select { padding: 4px 8px; }
+.inline input[name="note"] { width: 140px; }
