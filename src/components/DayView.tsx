@@ -14,6 +14,14 @@ export const roundLabel = (round: number) =>
 const title = (status: RoundStatus) =>
   [formatDate(status.date), roundLabel(status.round)].filter(Boolean).join(" · ");
 
+export function ThemeLine({ theme }: { theme?: string }) {
+  return theme ? (
+    <p className="theme">
+      Theme: <strong>{theme}</strong>
+    </p>
+  ) : null;
+}
+
 /** Who the round is waiting on. Public on purpose: slacking should be seen. */
 export function WaitingOn({ status }: { status: RoundStatus }) {
   if (status.revealed) return null;
@@ -43,6 +51,7 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
       <h3>
         <Link href={`/day/${status.date}`}>{title(status)}</Link>
       </h3>
+      <ThemeLine theme={game.themes.get(status.date)} />
       {status.round > 1 ? (
         <p className="muted">
           {status.raters.every((r) => status.submitters.some((s) => s.id === r.id))
@@ -94,6 +103,7 @@ export function RoundResults({
   return (
     <section className="day">
       <h3>{title(status)} results</h3>
+      <ThemeLine theme={game.themes.get(status.date)} />
       {tie ? (
         <p className="banner tie">
           Tie between {names(status.leaders.map((s) => nameOf(s.playerId)))}. On to a tiebreak!

@@ -3,8 +3,16 @@ function required(name: string, value: string | undefined): string {
   return value;
 }
 
+/**
+ * The project's base address. Supabase shows it in some places with /rest/v1 on
+ * the end; the client adds its own paths, so anything after the host is dropped.
+ */
+export function normalizeSupabaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, "").replace(/\/(rest|auth)\/v1$/, "");
+}
+
 export const supabaseUrl = () =>
-  required("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  normalizeSupabaseUrl(required("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL));
 
 export const supabasePublishableKey = () =>
   required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);

@@ -94,3 +94,8 @@ details { margin-top: 12px; }
 summary { cursor: pointer; color: var(--muted); }
 .banner.tie { color: var(--warn); }
 .card.tiebreak { border-color: var(--warn); }
+.theme { margin: 4px 0 12px; padding: 6px 12px; border-radius: 8px; background: rgba(226, 68, 92, 0.12); display: inline-block; }
+.pool { list-style: none; padding: 0; display: grid; gap: 6px; }
+.pool li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.inline { display: inline-flex; gap: 6px; align-items: center; margin: 2px 4px 2px 0; }
+.inline input { padding: 4px 8px; width: 180px; }

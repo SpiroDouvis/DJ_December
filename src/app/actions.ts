@@ -7,6 +7,7 @@ import { loadGame, requireAdmin, requireMe } from "@/lib/data";
 import { dayOutcome, isValidScore, owedDates } from "@/lib/game";
 import { resolveSong, SongLinkError } from "@/lib/music";
 import { authClient, dataClient } from "@/lib/supabase/server";
+import { drawTheme } from "@/lib/themes";
 import { formatDate, isGameDate } from "@/lib/time";
 
 export type FormState = { error?: string; ok?: string } | undefined;
@@ -172,5 +173,59 @@ export async function setAdmin(form: FormData) {
   if (id === me.id && !isAdmin) throw new Error("You can't remove your own admin access.");
   const { error } = await dataClient().from("players").update({ is_admin: isAdmin }).eq("id", id);
   if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
+const themeText = (value: FormDataEntryValue | null) => String(value ?? "").trim().slice(0, 80);
+
+export async function addTheme(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  const text = themeText(form.get("text"));
+  if (!text) return { error: "Type a theme." };
+  const { error } = await dataClient().from("themes").insert({ text });
+  if (error) {
+    if (error.code === "23505") return { error: "That theme is already in the pool." };
+    throw error;
+  }
+  revalidatePath("/", "layout");
+  return { ok: `Added "${text}".` };
+}
+
+export async function removeTheme(form: FormData) {
+  await requireAdmin();
+  const { error } = await dataClient().from("themes").delete().eq("id", String(form.get("id") ?? ""));
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
+/** Sets, redraws, clears or resets one day's theme. */
+export async function setDayTheme(form: FormData) {
+  await requireAdmin();
+  const date = String(form.get("date") ?? "");
+  const mode = String(form.get("mode") ?? "");
+  if (!isGameDate(date)) throw new Error("Unknown day.");
+  const db = dataClient();
+
+  if (mode === "reset") {
+    const { error } = await db.from("day_themes").delete().eq("game_date", date);
+    if (error) throw error;
+  } else {
+    let row: { theme_text: string | null; theme_id: string | null };
+    if (mode === "none") {
+      row = { theme_text: null, theme_id: null };
+    } else if (mode === "random") {
+      const game = await loadGame();
+      // Counting this day's current theme as used means a redraw gives a different one.
+      const theme = drawTheme(game.themePool, game.dayThemeRows.values());
+      if (!theme) throw new Error("The theme pool is empty.");
+      row = { theme_text: theme.text, theme_id: theme.id };
+    } else {
+      const text = themeText(form.get("text"));
+      if (!text) throw new Error("Type a theme.");
+      row = { theme_text: text, theme_id: null };
+    }
+    const { error } = await db.from("day_themes").upsert({ game_date: date, ...row }, { onConflict: "game_date" });
+    if (error) throw error;
+  }
   revalidatePath("/", "layout");
 }

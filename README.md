@@ -15,12 +15,14 @@ the highest total wins the day.
   others. Until then, the page shows who it's waiting on.
 - Miss a day and you owe that song. Late songs go in oldest day first, and each one
   belongs to the day it was missed.
-
 - A tie for the top starts a tiebreak: the tied players each send another song and only
   the other players rate them. If everyone tied, the round repeats with everyone. Tiebreaks
   repeat until there's one winner.
 
-Coming in later updates: themes, the schedule tab and stats.
+- Every second day has a theme, drawn at random from a pool when the day opens. Admins
+  can edit the pool and set, redraw or clear any day's theme on the Admin page.
+
+Coming in later updates: the schedule tab and stats.
 
 ## Stack
 

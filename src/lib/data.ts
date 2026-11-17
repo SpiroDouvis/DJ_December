@@ -5,6 +5,7 @@ import { authClient, dataClient } from "./supabase/server";
 import { adminEmails } from "./supabase/env";
 import type { Player, Rating, Submission } from "./game";
 import type { Service } from "./music";
+import { datesNeedingDraw, drawTheme, type DayThemeRow, type ThemeRow } from "./themes";
 import { gameDateOf, openDates, seasonFromEnv, type GameDate, type Season } from "./time";
 
 export type PlayerRow = {
@@ -78,26 +79,83 @@ export type Game = {
   submissions: Submission[];
   ratings: Rating[];
   songs: Map<string, Song>;
+  /** Themes of days that have opened. Days without a theme aren't in it. */
+  themes: Map<GameDate, string>;
+  /** Every saved day theme, including future ones an admin set. Not for players' eyes. */
+  dayThemeRows: Map<GameDate, DayThemeRow>;
+  themePool: ThemeRow[];
 };
+
+async function loadDayThemes(): Promise<Map<GameDate, DayThemeRow>> {
+  const { data, error } = await dataClient().from("day_themes").select("game_date, theme_text, theme_id");
+  if (error) throw error;
+  return new Map(
+    data.map((r) => [r.game_date, { date: r.game_date, text: r.theme_text, themeId: r.theme_id }]),
+  );
+}
+
+/**
+ * Draws the theme for any themed day that has opened without one. This runs on
+ * page load, so the first visit after 5 AM MST picks the day's theme. If two
+ * visits race, the database keeps whichever draw landed first.
+ */
+async function drawDueThemes(
+  season: Season,
+  open: GameDate[],
+  pool: ThemeRow[],
+  saved: Map<GameDate, DayThemeRow>,
+): Promise<Map<GameDate, DayThemeRow>> {
+  const due = datesNeedingDraw(season, open, saved);
+  if (due.length === 0) return saved;
+  const picked = [...saved.values()];
+  const rows = [];
+  for (const date of due) {
+    const theme = drawTheme(pool, picked);
+    if (!theme) break;
+    const row = { date, text: theme.text, themeId: theme.id };
+    picked.push(row);
+    rows.push({ game_date: date, theme_text: theme.text, theme_id: theme.id });
+  }
+  if (rows.length === 0) return saved;
+  const { error } = await dataClient()
+    .from("day_themes")
+    .upsert(rows, { onConflict: "game_date", ignoreDuplicates: true });
+  if (error) throw error;
+  return loadDayThemes();
+}
 
 /** Everything in the game. A season is at most a few thousand rows, so we load it all. */
 export async function loadGame(): Promise<Game> {
   const db = dataClient();
-  const [players, submissions, ratings, songs] = await Promise.all([
+  const [players, submissions, ratings, songs, pool, savedThemes] = await Promise.all([
     db.from("players").select("*").order("display_name"),
     db.from("submissions").select("id, player_id, game_date, round, song_id"),
     db.from("ratings").select("submission_id, rater_id, score"),
     db.from("songs").select("id, title, artist, artwork_url, spotify_url, apple_music_url"),
+    db.from("themes").select("id, text").order("text"),
+    loadDayThemes(),
   ]);
+  if (pool.error) throw pool.error;
   for (const r of [players, submissions, ratings, songs]) if (r.error) throw r.error;
 
   const season = seasonFromEnv();
   const today = gameDateOf(new Date());
   const playerRows = players.data as PlayerRow[];
+  const open = openDates(season, today);
+  const themePool = pool.data as ThemeRow[];
+  const dayThemeRows = await drawDueThemes(season, open, themePool, savedThemes);
+  const themes = new Map<GameDate, string>();
+  for (const d of open) {
+    const text = dayThemeRows.get(d)?.text;
+    if (text) themes.set(d, text);
+  }
   return {
     season,
     today,
-    open: openDates(season, today),
+    open,
+    themes,
+    dayThemeRows,
+    themePool,
     playerRows,
     players: playerRows.map((p) => ({ id: p.id, name: p.display_name, joinedOn: p.joined_on })),
     submissions: submissions.data!.map((s) => ({
