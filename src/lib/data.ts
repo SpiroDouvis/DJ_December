@@ -85,7 +85,7 @@ export async function loadGame(): Promise<Game> {
   const db = dataClient();
   const [players, submissions, ratings, songs] = await Promise.all([
     db.from("players").select("*").order("display_name"),
-    db.from("submissions").select("id, player_id, game_date, song_id"),
+    db.from("submissions").select("id, player_id, game_date, round, song_id"),
     db.from("ratings").select("submission_id, rater_id, score"),
     db.from("songs").select("id, title, artist, artwork_url, spotify_url, apple_music_url"),
   ]);
@@ -104,6 +104,7 @@ export async function loadGame(): Promise<Game> {
       id: s.id,
       playerId: s.player_id,
       date: s.game_date,
+      round: s.round,
       songId: s.song_id,
     })),
     ratings: ratings.data!.map((r) => ({

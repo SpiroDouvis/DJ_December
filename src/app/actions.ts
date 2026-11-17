@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { loadGame, requireAdmin, requireMe } from "@/lib/data";
-import { dayStatus, isValidScore, owedDates } from "@/lib/game";
+import { dayOutcome, isValidScore, owedDates } from "@/lib/game";
 import { resolveSong, SongLinkError } from "@/lib/music";
 import { authClient, dataClient } from "@/lib/supabase/server";
 import { formatDate, isGameDate } from "@/lib/time";
@@ -32,22 +32,32 @@ export async function signOut() {
 export async function submitSong(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await requireMe();
   const date = String(form.get("date") ?? "");
+  const round = Number(form.get("round") ?? 1);
   const link = String(form.get("link") ?? "");
   if (!isGameDate(date)) return { error: "Unknown day." };
+  if (!Number.isInteger(round) || round < 1) return { error: "Unknown round." };
 
   const game = await loadGame();
-  const existing = game.submissions.find((s) => s.playerId === me.id && s.date === date);
+  const existing = game.submissions.find(
+    (s) => s.playerId === me.id && s.date === date && s.round === round,
+  );
 
   if (existing) {
     // Swapping a song is fine until anyone has rated it.
     if (game.ratings.some((r) => r.submissionId === existing.id)) {
       return { error: "Someone has already rated that song, so it can't be changed." };
     }
-  } else {
+  } else if (round === 1) {
     const owed = owedDates(me.id, game.open, game.players, game.submissions);
     if (!owed.includes(date)) return { error: `You can't send a song for ${formatDate(date)}.` };
     if (owed[0] !== date) {
       return { error: `Send your song for ${formatDate(owed[0])} first.` };
+    }
+  } else {
+    if (!game.open.includes(date)) return { error: "Unknown day." };
+    const current = dayOutcome(date, game.players, game.submissions, game.ratings).current;
+    if (current.round !== round || !current.submitters.some((p) => p.id === me.id)) {
+      return { error: `You're not in that tiebreak.` };
     }
   }
 
@@ -79,14 +89,17 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
 
   const { error } = existing
     ? await db.from("submissions").update({ song_id: saved.id }).eq("id", existing.id)
-    : await db.from("submissions").insert({ player_id: me.id, game_date: date, song_id: saved.id });
+    : await db
+        .from("submissions")
+        .insert({ player_id: me.id, game_date: date, round, song_id: saved.id });
   if (error) {
     if (error.code === "23505") return { error: "You've already sent a song for that day." };
     throw error;
   }
 
   revalidatePath("/", "layout");
-  return { ok: `Sent "${song.title}" for ${formatDate(date)}.` };
+  const what = round === 1 ? formatDate(date) : `the ${formatDate(date)} tiebreak`;
+  return { ok: `Sent "${song.title}" for ${what}.` };
 }
 
 export async function rateSong(form: FormData) {
@@ -99,9 +112,11 @@ export async function rateSong(form: FormData) {
   const submission = game.submissions.find((s) => s.id === submissionId);
   if (!submission) throw new Error("That song isn't in the game.");
   if (submission.playerId === me.id) throw new Error("You can't rate your own song.");
-  const status = dayStatus(submission.date, game.players, game.submissions, game.ratings);
-  if (!status.players.some((p) => p.id === me.id)) throw new Error("You weren't playing that day.");
-  if (status.revealed) throw new Error("That day's results are already out.");
+  const outcome = dayOutcome(submission.date, game.players, game.submissions, game.ratings);
+  const status = outcome.rounds.find((r) => r.round === submission.round);
+  if (!status) throw new Error("That round isn't being played.");
+  if (!status.raters.some((p) => p.id === me.id)) throw new Error("You don't rate this round.");
+  if (status.revealed) throw new Error("That round's results are already out.");
 
   const { error } = await dataClient()
     .from("ratings")

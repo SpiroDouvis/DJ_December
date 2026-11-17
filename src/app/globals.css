@@ -92,3 +92,5 @@ tr.winner td { background: rgba(63, 182, 139, 0.12); }
 .results { padding-left: 20px; }
 details { margin-top: 12px; }
 summary { cursor: pointer; color: var(--muted); }
+.banner.tie { color: var(--warn); }
+.card.tiebreak { border-color: var(--warn); }
