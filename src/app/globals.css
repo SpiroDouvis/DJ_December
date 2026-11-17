@@ -108,3 +108,5 @@ summary { cursor: pointer; color: var(--muted); }
 .avail.busy { color: var(--warn); }
 .inline select { padding: 4px 8px; }
 .inline input[name="note"] { width: 140px; }
+table.grid th:first-child { color: var(--muted); font-weight: 600; }
+.fans { padding-left: 20px; display: grid; gap: 6px; }
