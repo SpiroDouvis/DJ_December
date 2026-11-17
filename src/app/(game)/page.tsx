@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { OpenRound, roundLabel } from "@/components/DayView";
+import { OpenRound, roundLabel, ThemeLine } from "@/components/DayView";
 import { SongCard } from "@/components/SongCard";
 import { SubmitSongForm } from "@/components/SubmitSongForm";
 import { loadGame, requireMe } from "@/lib/data";
@@ -45,6 +45,7 @@ export default async function Home() {
             {formatDate(t.date)} {roundLabel(t.round).toLowerCase()}!
           </h2>
           <p>You tied for the top. Send another song to settle it.</p>
+          <ThemeLine theme={game.themes.get(t.date)} />
           <SubmitSongForm date={t.date} round={t.round} cta="Send tiebreak song" />
         </section>
       ))}
@@ -61,6 +62,7 @@ export default async function Home() {
             ) : (
               <p>Send your song for today, {formatDate(owed[0])}.</p>
             )}
+            <ThemeLine theme={game.themes.get(owed[0])} />
             <SubmitSongForm key={owed[0]} date={owed[0]} cta={`Send for ${formatDate(owed[0])}`} />
           </>
         ) : todays && todaysSong ? (
