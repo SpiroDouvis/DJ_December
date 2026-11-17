@@ -26,7 +26,8 @@ the highest total wins the day.
   when its day opens) and mark when they're free or busy to rate. A busy note shows next
   to their name when a day is waiting on them.
 
-Coming in a later update: stats.
+- The Stats tab shows wins, average ratings given and received, a grid of who rates whom,
+  and each player's biggest fan and toughest critic. Only revealed days count.
 
 ## Stack
 
