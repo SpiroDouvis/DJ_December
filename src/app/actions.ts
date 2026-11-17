@@ -7,8 +7,9 @@ import { loadGame, requireAdmin, requireMe } from "@/lib/data";
 import { dayOutcome, isValidScore, owedDates } from "@/lib/game";
 import { resolveSong, SongLinkError } from "@/lib/music";
 import { authClient, dataClient } from "@/lib/supabase/server";
+import { queueBlocker } from "@/lib/schedule";
 import { drawTheme } from "@/lib/themes";
-import { formatDate, isGameDate } from "@/lib/time";
+import { formatDate, gameDateOf, isGameDate } from "@/lib/time";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -48,6 +49,9 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
     if (game.ratings.some((r) => r.submissionId === existing.id)) {
       return { error: "Someone has already rated that song, so it can't be changed." };
     }
+  } else if (round === 1 && date > game.today) {
+    const blocker = queueBlocker(date, game.today, game.season, me.joined_on, game.dayThemeRows);
+    if (blocker) return { error: blocker };
   } else if (round === 1) {
     const owed = owedDates(me.id, game.open, game.players, game.submissions);
     if (!owed.includes(date)) return { error: `You can't send a song for ${formatDate(date)}.` };
@@ -99,7 +103,12 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
   }
 
   revalidatePath("/", "layout");
-  const what = round === 1 ? formatDate(date) : `the ${formatDate(date)} tiebreak`;
+  const what =
+    round > 1
+      ? `the ${formatDate(date)} tiebreak`
+      : date > game.today
+        ? `${formatDate(date)}. It goes in when the day opens`
+        : formatDate(date);
   return { ok: `Sent "${song.title}" for ${what}.` };
 }
 
@@ -226,6 +235,51 @@ export async function setDayTheme(form: FormData) {
     }
     const { error } = await db.from("day_themes").upsert({ game_date: date, ...row }, { onConflict: "game_date" });
     if (error) throw error;
+    // Queued songs were picked without the theme, so a newly themed future day drops them.
+    if (row.theme_text !== null && date > gameDateOf(new Date())) {
+      const { error: dropError } = await db
+        .from("submissions")
+        .delete()
+        .eq("game_date", date)
+        .eq("round", 1);
+      if (dropError) throw dropError;
+    }
   }
+  revalidatePath("/", "layout");
+}
+
+export async function removeQueuedSong(form: FormData) {
+  const me = await requireMe();
+  const date = String(form.get("date") ?? "");
+  if (!isGameDate(date) || date <= gameDateOf(new Date())) {
+    throw new Error("Only songs for days that haven't opened can be removed.");
+  }
+  const { error } = await dataClient()
+    .from("submissions")
+    .delete()
+    .eq("player_id", me.id)
+    .eq("game_date", date)
+    .eq("round", 1);
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
+export async function setAvailability(form: FormData) {
+  const me = await requireMe();
+  const date = String(form.get("date") ?? "");
+  const status = String(form.get("status") ?? "");
+  const note = String(form.get("note") ?? "").trim().slice(0, 60) || null;
+  if (!isGameDate(date)) throw new Error("Unknown day.");
+  const db = dataClient();
+  const { error } =
+    status === "available" || status === "busy"
+      ? await db
+          .from("availability")
+          .upsert(
+            { player_id: me.id, game_date: date, status, note, updated_at: new Date().toISOString() },
+            { onConflict: "player_id,game_date" },
+          )
+      : await db.from("availability").delete().eq("player_id", me.id).eq("game_date", date);
+  if (error) throw error;
   revalidatePath("/", "layout");
 }

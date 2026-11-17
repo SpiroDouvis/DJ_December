@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Game, Me } from "@/lib/data";
 import { dayOutcome, shuffledForDisplay, type DayOutcome, type RoundStatus } from "@/lib/game";
+import { availabilityKey } from "@/lib/schedule";
 import { formatDate } from "@/lib/time";
 import { RatingForm } from "./RatingForm";
 import { SongCard } from "./SongCard";
@@ -23,11 +24,20 @@ export function ThemeLine({ theme }: { theme?: string }) {
 }
 
 /** Who the round is waiting on. Public on purpose: slacking should be seen. */
-export function WaitingOn({ status }: { status: RoundStatus }) {
+export function WaitingOn({ status, game }: { status: RoundStatus; game: Game }) {
   if (status.revealed) return null;
-  const songs = status.missingSongs.map((p) => p.name);
+  // What each player said about today on the schedule tab, if anything.
+  const today = (id: string) => {
+    const a = game.availability.get(availabilityKey(id, game.today));
+    if (!a) return "";
+    return `${a.status === "busy" ? "busy today" : "free today"}${a.note ? `: ${a.note}` : ""}`;
+  };
+  const songs = status.missingSongs.map((p) => (today(p.id) ? `${p.name} (${today(p.id)})` : p.name));
   const raters = status.ratingsLeft.map(
-    (x) => `${x.player.name} (${x.count} ${x.count === 1 ? "rating" : "ratings"})`,
+    (x) =>
+      `${x.player.name} (${[`${x.count} ${x.count === 1 ? "rating" : "ratings"}`, today(x.player.id)]
+        .filter(Boolean)
+        .join(", ")})`,
   );
   return (
     <div className="waiting">
@@ -61,7 +71,7 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
               )} ${status.raters.length === 1 ? "rates" : "rate"} them.`}
         </p>
       ) : null}
-      <WaitingOn status={status} />
+      <WaitingOn status={status} game={game} />
       {others.length === 0 ? <p className="muted">No songs to rate yet.</p> : null}
       <div className="songs">
         {others.map((s, i) => {
