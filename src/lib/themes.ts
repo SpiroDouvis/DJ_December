@@ -1,7 +1,8 @@
 import { randomInt } from "node:crypto";
 import { addDays, type GameDate, type Season } from "./time";
 
-export type ThemeRow = { id: string; text: string };
+/** An idea in the theme pool. submittedBy is null once its player has been removed. */
+export type ThemeRow = { id: string; text: string; submittedBy: string | null; createdAt: string };
 /** A saved decision for one day. A null text means the day has no theme. */
 export type DayThemeRow = { date: GameDate; text: string | null; themeId: string | null };
 
@@ -23,11 +24,11 @@ export function isThemed(season: Season, date: GameDate, saved: Map<GameDate, Da
  * Draws a theme at random, preferring ones no day has used yet. Once every
  * theme has been used, any of them can come up again.
  */
-export function drawTheme(
-  pool: ThemeRow[],
+export function drawTheme<T extends Pick<ThemeRow, "id" | "text">>(
+  pool: T[],
   saved: Iterable<DayThemeRow>,
   random: (max: number) => number = randomInt,
-): ThemeRow | null {
+): T | null {
   if (pool.length === 0) return null;
   const used = new Set<string>();
   for (const row of saved) if (row.themeId) used.add(row.themeId);
@@ -43,4 +44,17 @@ export function datesNeedingDraw(
   saved: Map<GameDate, DayThemeRow>,
 ): GameDate[] {
   return open.filter((d) => !saved.has(d) && isDefaultThemed(season, d));
+}
+
+/**
+ * The day each pool idea was used on, counting only days that have opened, so
+ * an admin's pick for a future day stays secret.
+ */
+export function usedOn(open: GameDate[], saved: Map<GameDate, DayThemeRow>): Map<string, GameDate> {
+  const used = new Map<string, GameDate>();
+  for (const d of open) {
+    const id = saved.get(d)?.themeId;
+    if (id && !used.has(id)) used.set(id, d);
+  }
+  return used;
 }

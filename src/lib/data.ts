@@ -135,7 +135,7 @@ export async function loadGame(): Promise<Game> {
     db.from("submissions").select("id, player_id, game_date, round, song_id"),
     db.from("ratings").select("submission_id, rater_id, score"),
     db.from("songs").select("id, title, artist, artwork_url, spotify_url, apple_music_url"),
-    db.from("themes").select("id, text").order("text"),
+    db.from("themes").select("id, text, submitted_by, created_at").order("created_at", { ascending: false }),
     loadDayThemes(),
     db.from("availability").select("player_id, game_date, status, note"),
   ]);
@@ -147,7 +147,12 @@ export async function loadGame(): Promise<Game> {
   const today = gameDateOf(new Date());
   const playerRows = players.data as PlayerRow[];
   const open = openDates(season, today);
-  const themePool = pool.data as ThemeRow[];
+  const themePool: ThemeRow[] = pool.data.map((t) => ({
+    id: t.id,
+    text: t.text,
+    submittedBy: t.submitted_by,
+    createdAt: t.created_at,
+  }));
   const dayThemeRows = await drawDueThemes(season, open, themePool, savedThemes);
   const themes = new Map<GameDate, string>();
   for (const d of open) {

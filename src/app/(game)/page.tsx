@@ -36,7 +36,11 @@ export default async function Home() {
             <Link href="/schedule" className="text-violet-200 underline hover:text-white">
               queue songs
             </Link>{" "}
-            for days without a theme and mark when you&apos;re free to rate.
+            for days without a theme and mark when you&apos;re free to rate, and{" "}
+            <Link href="/ideas" className="text-violet-200 underline hover:text-white">
+              add theme ideas
+            </Link>{" "}
+            for the theme days.
           </p>
         </CardContent>
       </Card>
