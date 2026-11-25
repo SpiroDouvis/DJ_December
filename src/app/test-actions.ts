@@ -6,6 +6,7 @@
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { FormState } from "@/app/actions";
 import { loadGame, requireRealAdmin, testRound, TEST_COOKIE } from "@/lib/data";
 import {
@@ -42,8 +43,45 @@ async function setTestCookie(on: boolean) {
 const SETUP_HINT =
   'Run the test sandbox migration in the Supabase SQL editor, then add "sandbox" to the exposed schemas under Project Settings > Data API.';
 
+/**
+ * A readable message for any failure. Production builds hide thrown errors'
+ * messages, so test actions show them on the page instead of throwing.
+ */
+function describe(e: unknown): string {
+  if (e && typeof e === "object") {
+    const { message, details, hint, code } = e as Record<string, unknown>;
+    const text = [message, details, hint].filter((x) => typeof x === "string" && x).join(" ");
+    if (text) return code ? `${text} (code ${code})` : text;
+  }
+  return String(e);
+}
+
+/** Runs a plain-form test action, sending any failure back to the Test page to show. */
+async function orShowError(work: () => Promise<void>) {
+  await requireRealAdmin();
+  let failure: string | null = null;
+  try {
+    await work();
+  } catch (e) {
+    console.error("Test round action failed", e);
+    failure = describe(e);
+  }
+  revalidatePath("/", "layout");
+  if (failure) redirect(`/test?error=${encodeURIComponent(failure.slice(0, 500))}`);
+}
+
 /** Wipes the sandbox and starts a new test round with fake players. */
-export async function startTestRound(_prev: FormState, form: FormData): Promise<FormState> {
+export async function startTestRound(prev: FormState, form: FormData): Promise<FormState> {
+  await requireRealAdmin();
+  try {
+    return await startTestRoundUnsafe(prev, form);
+  } catch (e) {
+    console.error("Starting a test round failed", e);
+    return { error: `Couldn't start the test round: ${describe(e)}` };
+  }
+}
+
+async function startTestRoundUnsafe(_prev: FormState, form: FormData): Promise<FormState> {
   const real = await requireRealAdmin();
   const others = Number(form.get("players") ?? 3);
   const days = Number(form.get("days") ?? 6);
@@ -128,24 +166,20 @@ export async function startTestRound(_prev: FormState, form: FormData): Promise<
 
 /** Back to the real game. The test round stays saved. */
 export async function leaveTestMode() {
-  await requireRealAdmin();
-  await setTestCookie(false);
-  revalidatePath("/", "layout");
+  await orShowError(() => setTestCookie(false));
 }
 
 export async function resumeTestMode() {
-  await requireRealAdmin();
-  await setTestCookie(true);
-  revalidatePath("/", "layout");
+  await orShowError(() => setTestCookie(true));
 }
 
 /** Deletes everything in the sandbox and goes back to the real game. */
 export async function wipeTestRound() {
-  await requireRealAdmin();
-  const { error } = await sandbox().rpc("reset");
-  if (error) throw new Error(`Couldn't reach the test sandbox (${error.message}). ${SETUP_HINT}`);
-  await setTestCookie(false);
-  revalidatePath("/", "layout");
+  await orShowError(async () => {
+    const { error } = await sandbox().rpc("reset");
+    if (error) throw new Error(`Couldn't reach the test sandbox (${error.message}). ${SETUP_HINT}`);
+    await setTestCookie(false);
+  });
 }
 
 async function requireTestRound() {
@@ -157,6 +191,10 @@ async function requireTestRound() {
 
 /** Moves the test round's clock: next day, previous day, or a chosen day. */
 export async function setTestDay(form: FormData) {
+  await orShowError(() => setTestDayUnsafe(form));
+}
+
+async function setTestDayUnsafe(form: FormData) {
   const round = await requireTestRound();
   const mode = String(form.get("mode") ?? "");
   const first = addDays(round.season.start, -1);
@@ -168,11 +206,14 @@ export async function setTestDay(form: FormData) {
   if (today > last) today = last;
   const { error } = await sandbox().from("settings").update({ today }).eq("id", true);
   if (error) throw error;
-  revalidatePath("/", "layout");
 }
 
 /** Plays the test round as another sandbox player. */
 export async function actAs(form: FormData) {
+  await orShowError(() => actAsUnsafe(form));
+}
+
+async function actAsUnsafe(form: FormData) {
   await requireTestRound();
   const id = String(form.get("id") ?? "");
   const { data, error } = await sandbox().from("players").select("id").eq("id", id).maybeSingle();
@@ -180,14 +221,23 @@ export async function actAs(form: FormData) {
   if (!data) throw new Error("That player isn't in the test round.");
   const { error: updateError } = await sandbox().from("settings").update({ acting_as: id }).eq("id", true);
   if (updateError) throw updateError;
-  revalidatePath("/", "layout");
 }
 
 /**
  * Has players send the songs they owe and/or rate the songs waiting on them,
  * on every day that has opened in the test round.
  */
-export async function simulate(_prev: FormState, form: FormData): Promise<FormState> {
+export async function simulate(prev: FormState, form: FormData): Promise<FormState> {
+  await requireRealAdmin();
+  try {
+    return await simulateUnsafe(prev, form);
+  } catch (e) {
+    console.error("Filling in a test round failed", e);
+    return { error: `Couldn't fill in: ${describe(e)}` };
+  }
+}
+
+async function simulateUnsafe(_prev: FormState, form: FormData): Promise<FormState> {
   const round = await requireTestRound();
   const who = String(form.get("who") ?? "others");
   const what = String(form.get("what") ?? "both");
