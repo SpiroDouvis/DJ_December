@@ -128,7 +128,15 @@ async function startTestRoundUnsafe(_prev: FormState, form: FormData): Promise<F
         service: real.service,
         joined_on: start,
       },
-      ...fakes.map((f) => ({ email: f.email, display_name: f.display_name, is_admin: f.is_admin, joined_on: f.joined_on })),
+      // Every row lists the same columns: in a bulk insert, a column one row leaves
+      // out is sent as null rather than getting its default.
+      ...fakes.map((f) => ({
+        email: f.email,
+        display_name: f.display_name,
+        is_admin: f.is_admin,
+        service: "spotify",
+        joined_on: f.joined_on,
+      })),
     ])
     .select("id, email");
   if (createError) throw createError;
