@@ -1,14 +1,12 @@
 import { signInWithGoogle } from "@/app/actions";
-import { Brand } from "@/components/Brand";
 import { CenterCard } from "@/components/CenterCard";
 import { Button } from "@/components/ui/button";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   return (
-    <CenterCard>
+    <CenterCard logo>
       <h1 className="sr-only">DJ December</h1>
-      <Brand large />
       <p className="text-muted-foreground">A song a day, rated by your friends.</p>
       <form action={signInWithGoogle} className="w-full">
         <Button type="submit" size="lg" className="w-full">
