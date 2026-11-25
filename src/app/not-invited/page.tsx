@@ -1,15 +1,19 @@
 import { signOut } from "@/app/actions";
+import { Brand } from "@/components/Brand";
+import { CenterCard } from "@/components/CenterCard";
+import { Button } from "@/components/ui/button";
 
 export default function NotInvited() {
   return (
-    <main className="center">
-      <section className="card">
-        <h1>You&apos;re not on the list</h1>
-        <p>Ask the admin to add the Google email you signed in with, then try again.</p>
-        <form action={signOut}>
-          <button type="submit">Sign out</button>
-        </form>
-      </section>
-    </main>
+    <CenterCard>
+      <Brand large />
+      <h1 className="text-xl font-semibold">You&apos;re not on the list</h1>
+      <p className="text-muted-foreground">Ask the admin to add the Google email you signed in with, then try again.</p>
+      <form action={signOut}>
+        <Button type="submit" variant="secondary">
+          Sign out
+        </Button>
+      </form>
+    </CenterCard>
   );
 }

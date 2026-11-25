@@ -2,6 +2,10 @@ import Link from "next/link";
 import { OpenRound, roundLabel, ThemeLine } from "@/components/DayView";
 import { SongCard } from "@/components/SongCard";
 import { SubmitSongForm } from "@/components/SubmitSongForm";
+import { Stagger, StaggerItem } from "@/components/motion";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlarmClock, ChevronRight, Disc3, ListMusic, PartyPopper, Swords, Trophy } from "lucide-react";
 import { loadGame, requireMe } from "@/lib/data";
 import { dayOutcome, owedDates, owedTiebreaks } from "@/lib/game";
 import { formatDate } from "@/lib/time";
@@ -15,17 +19,27 @@ export default async function Home() {
 
   if (game.open.length === 0) {
     return (
-      <section className="card">
-        <h2>Get ready</h2>
-        <p>
-          DJ December starts {formatDate(game.season.start)} at 5 AM MST. Each day, send one song and rate
-          everyone else&apos;s.
-        </p>
-        <p>
-          You can already <Link href="/schedule">queue songs</Link> for days without a theme and mark when
-          you&apos;re free to rate.
-        </p>
-      </section>
+      <Card className="glow">
+        <CardHeader>
+          <CardTitle className="text-2xl">
+            <PartyPopper className="size-6 text-violet-300" aria-hidden />
+            Get ready
+          </CardTitle>
+          <CardDescription className="text-base">
+            DJ December starts <strong className="text-foreground">{formatDate(game.season.start)}</strong> at 5 AM
+            MST. Each day, send one song and rate everyone else&apos;s.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            You can already{" "}
+            <Link href="/schedule" className="text-violet-200 underline hover:text-white">
+              queue songs
+            </Link>{" "}
+            for days without a theme and mark when you&apos;re free to rate.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -45,24 +59,38 @@ export default async function Home() {
   return (
     <>
       {tiebreaks.map((t) => (
-        <section className="card tiebreak" key={`${t.date}-${t.round}`}>
-          <h2>
-            {formatDate(t.date)} {roundLabel(t.round).toLowerCase()}!
-          </h2>
-          <p>You tied for the top. Send another song to settle it.</p>
-          <ThemeLine theme={game.themes.get(t.date)} />
-          <SubmitSongForm date={t.date} round={t.round} cta="Send tiebreak song" />
-        </section>
+        <Card className="border-warning/50 shadow-[0_10px_40px_-14px_var(--warning)]" key={`${t.date}-${t.round}`}>
+          <CardHeader>
+            <CardTitle>
+              <Swords className="size-5 text-warning" aria-hidden />
+              {formatDate(t.date)} {roundLabel(t.round).toLowerCase()}!
+            </CardTitle>
+            <CardDescription>You tied for the top. Send another song to settle it.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <ThemeLine theme={game.themes.get(t.date)} />
+            <SubmitSongForm date={t.date} round={t.round} cta="Send tiebreak song" />
+          </CardContent>
+        </Card>
       ))}
 
-      <section className="card">
-        <h2>Your song</h2>
+      <Card className="glow">
+        <CardHeader>
+          <CardTitle className="text-xl">
+            <Disc3 className="size-5 text-violet-300" aria-hidden />
+            Your song
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
         {owed.length > 0 ? (
           <>
             {owed[0] < game.today ? (
-              <p className="late">
-                You&apos;re behind! You still owe {owed.length === 1 ? "a song" : `${owed.length} songs`} (
-                {owed.map(formatDate).join(", ")}). Start with {formatDate(owed[0])}.
+              <p className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 font-medium text-warning">
+                <AlarmClock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  You&apos;re behind! You still owe {owed.length === 1 ? "a song" : `${owed.length} songs`} (
+                  {owed.map(formatDate).join(", ")}). Start with {formatDate(owed[0])}.
+                </span>
               </p>
             ) : (
               <p>Send your song for today, {formatDate(owed[0])}.</p>
@@ -72,44 +100,76 @@ export default async function Home() {
           </>
         ) : todays && todaysSong ? (
           <>
-            <p>You&apos;re all caught up. Your song for today:</p>
-            <SongCard song={todaysSong} service={me.service} label="Your song" />
+            <p className="flex items-center gap-2">
+              <Badge variant="success">All caught up</Badge>
+              <span className="text-muted-foreground">Your song for today:</span>
+            </p>
+            <div className="max-w-md">
+              <SongCard song={todaysSong} service={me.service} label="Your song" />
+            </div>
             {!todaysRated ? (
-              <details>
-                <summary>Change it (only until someone rates it)</summary>
-                <SubmitSongForm date={game.today} cta="Swap song" />
+              <details className="group rounded-lg border bg-background/30 px-4 py-2 open:pb-4">
+                <summary className="cursor-pointer text-sm text-muted-foreground marker:text-violet-300 hover:text-foreground">
+                  Change it (only until someone rates it)
+                </summary>
+                <div className="mt-3">
+                  <SubmitSongForm date={game.today} cta="Swap song" />
+                </div>
               </details>
             ) : null}
           </>
         ) : (
-          <p>You&apos;re all caught up.</p>
+          <p>
+            <Badge variant="success">All caught up</Badge>
+          </p>
         )}
-        <p className="muted">
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <ListMusic className="size-4" aria-hidden />
           {queuedCount > 0
             ? `You have ${queuedCount} ${queuedCount === 1 ? "song" : "songs"} queued for later days. `
             : ""}
-          <Link href="/schedule">Queue songs ahead</Link> for days without a theme.
+          <Link href="/schedule" className="text-violet-200 underline hover:text-white">
+            Queue songs ahead
+          </Link>{" "}
+          for days without a theme.
         </p>
-      </section>
+        </CardContent>
+      </Card>
 
-      <h2>To rate</h2>
-      {pending.length === 0 ? <p className="muted">Every day so far has its results out.</p> : null}
+      <h2 className="mt-2 text-2xl font-bold tracking-tight">To rate</h2>
+      {pending.length === 0 ? (
+        <p className="text-muted-foreground">Every day so far has its results out.</p>
+      ) : null}
       {pending.map((o) => (
         <OpenRound key={o.date} game={game} me={me} status={o.current} />
       ))}
 
       {decided.length > 0 ? (
-        <section>
-          <h2>Results</h2>
-          <ul className="results">
+        <section className="flex flex-col gap-3">
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">Results</h2>
+          <Stagger className="grid gap-2">
             {decided.map((o) => (
-              <li key={o.date}>
-                <Link href={`/day/${o.date}`}>{formatDate(o.date)}</Link>: {nameOf(o.winner!.playerId)} won with
-                &quot;{game.songs.get(o.winner!.songId)?.title}&quot;
-                {o.rounds.length > 1 ? " after a tiebreak" : ""}
-              </li>
+              <StaggerItem key={o.date}>
+                <Link
+                  href={`/day/${o.date}`}
+                  className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 no-underline backdrop-blur-md transition-all hover:border-primary/50 hover:bg-accent/40"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gold/15 text-gold">
+                    <Trophy className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-medium text-muted-foreground">{formatDate(o.date)}</span>
+                    <span className="block truncate">
+                      <strong>{nameOf(o.winner!.playerId)}</strong> won with &quot;
+                      {game.songs.get(o.winner!.songId)?.title}&quot;
+                    </span>
+                  </span>
+                  {o.rounds.length > 1 ? <Badge variant="warning">Tiebreak</Badge> : null}
+                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </StaggerItem>
             ))}
-          </ul>
+          </Stagger>
         </section>
       ) : null}
     </>

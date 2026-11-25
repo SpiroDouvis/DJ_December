@@ -3,8 +3,12 @@ import type { Game, Me } from "@/lib/data";
 import { dayOutcome, shuffledForDisplay, type DayOutcome, type RoundStatus } from "@/lib/game";
 import { availabilityKey } from "@/lib/schedule";
 import { formatDate } from "@/lib/time";
+import { Hourglass, Trophy } from "lucide-react";
+import { ResultBanner, RevealRow, RevealRows, Stagger, StaggerItem, ThemeReveal } from "./motion";
 import { RatingForm } from "./RatingForm";
 import { SongCard } from "./SongCard";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Table, TableHead, TableHeader, TableRow } from "./ui/table";
 
 const names = (list: string[]) =>
   list.length <= 1 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
@@ -17,9 +21,9 @@ const title = (status: RoundStatus) =>
 
 export function ThemeLine({ theme }: { theme?: string }) {
   return theme ? (
-    <p className="theme">
-      Theme: <strong>{theme}</strong>
-    </p>
+    <div>
+      <ThemeReveal theme={theme} />
+    </div>
   ) : null;
 }
 
@@ -40,10 +44,13 @@ export function WaitingOn({ status, game }: { status: RoundStatus; game: Game })
         .join(", ")})`,
   );
   return (
-    <div className="waiting">
-      <strong>Waiting on</strong>
-      {songs.length ? <p>No song yet: {names(songs)}</p> : null}
-      {raters.length ? <p>Still rating: {names(raters)}</p> : null}
+    <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+      <Hourglass className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+      <div className="grid gap-0.5">
+        <strong className="text-warning">Waiting on</strong>
+        {songs.length ? <p>No song yet: {names(songs)}</p> : null}
+        {raters.length ? <p>Still rating: {names(raters)}</p> : null}
+      </div>
     </div>
   );
 }
@@ -57,13 +64,18 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
     game.ratings.find((r) => r.submissionId === submissionId && r.raterId === me.id)?.score;
 
   return (
-    <section className="day">
-      <h3>
-        <Link href={`/day/${status.date}`}>{title(status)}</Link>
-      </h3>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <Link href={`/day/${status.date}`} className="no-underline hover:text-violet-200">
+            {title(status)}
+          </Link>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
       <ThemeLine theme={game.themes.get(status.date)} />
       {status.round > 1 ? (
-        <p className="muted">
+        <p className="text-sm text-muted-foreground">
           {status.raters.every((r) => status.submitters.some((s) => s.id === r.id))
             ? "Everyone tied, so everyone sends another song and rates the rest."
             : `${names(status.submitters.map((p) => p.name))} tied. They each send another song, and ${names(
@@ -72,22 +84,27 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
         </p>
       ) : null}
       <WaitingOn status={status} game={game} />
-      {others.length === 0 ? <p className="muted">No songs to rate yet.</p> : null}
-      <div className="songs">
+      {others.length === 0 ? <p className="text-sm text-muted-foreground">No songs to rate yet.</p> : null}
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {others.map((s, i) => {
           const song = game.songs.get(s.songId);
           if (!song) return null;
           return (
-            <SongCard key={s.id} song={song} service={me.service} label={`Song ${i + 1}`}>
-              {rates ? <RatingForm submissionId={s.id} current={myScore(s.id)} /> : null}
-            </SongCard>
+            <StaggerItem key={s.id}>
+              <SongCard song={song} service={me.service} label={`Song ${i + 1}`}>
+                {rates ? <RatingForm submissionId={s.id} current={myScore(s.id)} /> : null}
+              </SongCard>
+            </StaggerItem>
           );
         })}
         {mine && game.songs.get(mine.songId) ? (
-          <SongCard song={game.songs.get(mine.songId)!} service={me.service} label="Your song" />
+          <StaggerItem>
+            <SongCard song={game.songs.get(mine.songId)!} service={me.service} label="Your song" />
+          </StaggerItem>
         ) : null}
-      </div>
-    </section>
+      </Stagger>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -111,74 +128,91 @@ export function RoundResults({
   const isWinningRound = outcome.winner !== null && outcome.current === status;
 
   return (
-    <section className="day">
-      <h3>{title(status)} results</h3>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <Trophy className="size-5 text-gold" aria-hidden />
+          {title(status)} results
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
       <ThemeLine theme={game.themes.get(status.date)} />
       {tie ? (
-        <p className="banner tie">
+        <ResultBanner kind="tie">
           Tie between {names(status.leaders.map((s) => nameOf(s.playerId)))}. On to a tiebreak!
-        </p>
+        </ResultBanner>
       ) : isWinningRound ? (
-        <p className="banner">
+        <ResultBanner kind="win">
           {nameOf(status.leaders[0].playerId)} wins {formatDate(status.date)}
           {status.round > 1 ? " in the tiebreak" : ""}!
-        </p>
+        </ResultBanner>
       ) : null}
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Song</th>
-              <th>Sent by</th>
-              {status.raters.map((p) => (
-                <th key={p.id}>{p.name}</th>
-              ))}
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r) => {
-              const song = game.songs.get(r.submission.songId);
-              return (
-                <tr key={r.submission.id} className={r.rank === 1 ? "winner" : undefined}>
-                  <td>{r.rank}</td>
-                  <td>
-                    {song?.title}
-                    <span className="muted"> {song?.artist}</span>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Rank</TableHead>
+            <TableHead>Song</TableHead>
+            <TableHead>Sent by</TableHead>
+            {status.raters.map((p) => (
+              <TableHead key={p.id}>{p.name}</TableHead>
+            ))}
+            <TableHead>Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <RevealRows>
+          {results.map((r) => {
+            const song = game.songs.get(r.submission.songId);
+            return (
+              <RevealRow key={r.submission.id} winner={r.rank === 1}>
+                <td className="px-3 py-2.5">
+                  {r.rank === 1 ? (
+                    <span className="inline-flex items-center gap-1 font-semibold text-gold">
+                      <Trophy className="size-3.5" />1
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{r.rank}</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap">
+                  {song?.title}
+                  <span className="text-muted-foreground"> {song?.artist}</span>
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap">{nameOf(r.submission.playerId)}</td>
+                {status.raters.map((p) => (
+                  <td key={p.id} className="px-3 py-2.5 font-mono tabular-nums">
+                    {p.id === r.submission.playerId ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      score(p.id, r.submission.id)?.toFixed(1)
+                    )}
                   </td>
-                  <td>{nameOf(r.submission.playerId)}</td>
-                  {status.raters.map((p) => (
-                    <td key={p.id}>
-                      {p.id === r.submission.playerId ? "—" : score(p.id, r.submission.id)?.toFixed(1)}
-                    </td>
-                  ))}
-                  <td>
-                    <strong>{r.total.toFixed(1)}</strong>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="muted">Columns show the rating each player gave.</p>
+                ))}
+                <td className="px-3 py-2.5 font-mono font-bold tabular-nums text-violet-200">{r.total.toFixed(1)}</td>
+              </RevealRow>
+            );
+          })}
+        </RevealRows>
+      </Table>
+      <CardDescription>Columns show the rating each player gave.</CardDescription>
 
-      <div className="songs">
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {results.map((r) => {
           const song = game.songs.get(r.submission.songId);
           return song ? (
-            <SongCard
-              key={r.submission.id}
-              song={song}
-              service={me.service}
-              label={`#${r.rank} · ${nameOf(r.submission.playerId)}`}
-            />
+            <StaggerItem key={r.submission.id}>
+              <SongCard
+                song={song}
+                service={me.service}
+                highlight={r.rank === 1 && isWinningRound}
+                label={`#${r.rank} · ${nameOf(r.submission.playerId)}`}
+              />
+            </StaggerItem>
           ) : null;
         })}
-      </div>
-    </section>
+      </Stagger>
+      </CardContent>
+    </Card>
   );
 }
 
