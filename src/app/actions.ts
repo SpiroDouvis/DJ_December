@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { loadGame, requireAdmin, requireMe } from "@/lib/data";
+import { gameClock, gameDb, loadGame, requireAdmin, requireMe } from "@/lib/data";
 import { dayOutcome, isValidScore, owedDates } from "@/lib/game";
 import { resolveSong, SongLinkError } from "@/lib/music";
-import { authClient, dataClient } from "@/lib/supabase/server";
+import { authClient } from "@/lib/supabase/server";
 import { queueBlocker } from "@/lib/schedule";
 import { drawTheme } from "@/lib/themes";
-import { formatDate, gameDateOf, isGameDate } from "@/lib/time";
+import { formatDate, isGameDate } from "@/lib/time";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -74,7 +74,7 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
     throw e;
   }
 
-  const db = dataClient();
+  const db = await gameDb();
   const { data: saved, error: songError } = await db
     .from("songs")
     .upsert(
@@ -128,7 +128,7 @@ export async function rateSong(form: FormData) {
   if (!status.raters.some((p) => p.id === me.id)) throw new Error("You don't rate this round.");
   if (status.revealed) throw new Error("That round's results are already out.");
 
-  const { error } = await dataClient()
+  const { error } = await (await gameDb())
     .from("ratings")
     .upsert(
       { submission_id: submissionId, rater_id: me.id, score },
@@ -141,7 +141,7 @@ export async function rateSong(form: FormData) {
 export async function setService(form: FormData) {
   const me = await requireMe();
   const service = form.get("service") === "apple" ? "apple" : "spotify";
-  const { error } = await dataClient().from("players").update({ service }).eq("id", me.id);
+  const { error } = await (await gameDb()).from("players").update({ service }).eq("id", me.id);
   if (error) throw error;
   revalidatePath("/", "layout");
 }
@@ -155,7 +155,7 @@ export async function addPlayer(_prev: FormState, form: FormData): Promise<FormS
   if (!name || name.length > 40) return { error: "Enter a name up to 40 characters." };
   if (!isGameDate(joinedOn)) return { error: "Pick the first day they play." };
 
-  const { error } = await dataClient()
+  const { error } = await (await gameDb())
     .from("players")
     .insert({ email, display_name: name, joined_on: joinedOn });
   if (error) {
@@ -170,7 +170,7 @@ export async function removePlayer(form: FormData) {
   const me = await requireAdmin();
   const id = String(form.get("id") ?? "");
   if (id === me.id) throw new Error("You can't remove yourself.");
-  const { error } = await dataClient().from("players").delete().eq("id", id);
+  const { error } = await (await gameDb()).from("players").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/", "layout");
 }
@@ -180,7 +180,7 @@ export async function setAdmin(form: FormData) {
   const id = String(form.get("id") ?? "");
   const isAdmin = form.get("isAdmin") === "true";
   if (id === me.id && !isAdmin) throw new Error("You can't remove your own admin access.");
-  const { error } = await dataClient().from("players").update({ is_admin: isAdmin }).eq("id", id);
+  const { error } = await (await gameDb()).from("players").update({ is_admin: isAdmin }).eq("id", id);
   if (error) throw error;
   revalidatePath("/", "layout");
 }
@@ -192,7 +192,7 @@ export async function addTheme(_prev: FormState, form: FormData): Promise<FormSt
   const me = await requireMe();
   const text = themeText(form.get("text"));
   if (!text) return { error: "Type a theme idea." };
-  const { error } = await dataClient().from("themes").insert({ text, submitted_by: me.id });
+  const { error } = await (await gameDb()).from("themes").insert({ text, submitted_by: me.id });
   if (error) {
     if (error.code === "23505") return { error: "That idea is already in the pool." };
     throw error;
@@ -205,7 +205,7 @@ export async function addTheme(_prev: FormState, form: FormData): Promise<FormSt
 export async function removeTheme(form: FormData) {
   const me = await requireMe();
   const id = String(form.get("id") ?? "");
-  const db = dataClient();
+  const db = await gameDb();
   if (!me.is_admin) {
     const { data: theme, error } = await db.from("themes").select("submitted_by").eq("id", id).maybeSingle();
     if (error) throw error;
@@ -228,7 +228,7 @@ export async function setDayTheme(form: FormData) {
   const date = String(form.get("date") ?? "");
   const mode = String(form.get("mode") ?? "");
   if (!isGameDate(date)) throw new Error("Unknown day.");
-  const db = dataClient();
+  const db = await gameDb();
 
   if (mode === "reset") {
     const { error } = await db.from("day_themes").delete().eq("game_date", date);
@@ -251,7 +251,7 @@ export async function setDayTheme(form: FormData) {
     const { error } = await db.from("day_themes").upsert({ game_date: date, ...row }, { onConflict: "game_date" });
     if (error) throw error;
     // Queued songs were picked without the theme, so a newly themed future day drops them.
-    if (row.theme_text !== null && date > gameDateOf(new Date())) {
+    if (row.theme_text !== null && date > (await gameClock()).today) {
       const { error: dropError } = await db
         .from("submissions")
         .delete()
@@ -266,10 +266,10 @@ export async function setDayTheme(form: FormData) {
 export async function removeQueuedSong(form: FormData) {
   const me = await requireMe();
   const date = String(form.get("date") ?? "");
-  if (!isGameDate(date) || date <= gameDateOf(new Date())) {
+  if (!isGameDate(date) || date <= (await gameClock()).today) {
     throw new Error("Only songs for days that haven't opened can be removed.");
   }
-  const { error } = await dataClient()
+  const { error } = await (await gameDb())
     .from("submissions")
     .delete()
     .eq("player_id", me.id)
@@ -285,7 +285,7 @@ export async function setAvailability(form: FormData) {
   const status = String(form.get("status") ?? "");
   const note = String(form.get("note") ?? "").trim().slice(0, 60) || null;
   if (!isGameDate(date)) throw new Error("Unknown day.");
-  const db = dataClient();
+  const db = await gameDb();
   const { error } =
     status === "available" || status === "busy"
       ? await db

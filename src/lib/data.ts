@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { authClient, dataClient } from "./supabase/server";
 import { adminEmails } from "./supabase/env";
@@ -29,8 +30,8 @@ export type Song = {
 
 export type Me = PlayerRow;
 
-/** The signed-in player. Sends anyone not on the player list away. */
-export const requireMe = cache(async (): Promise<Me> => {
+/** The signed-in person's player row in the real game. Sends anyone not on the player list away. */
+export const realMe = cache(async (): Promise<Me> => {
   const supabase = await authClient();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;
@@ -65,8 +66,76 @@ export const requireMe = cache(async (): Promise<Me> => {
   return created as PlayerRow;
 });
 
+/** Cookie an admin's browser carries while they play a test round. */
+export const TEST_COOKIE = "djd-test-round";
+
+export type TestRound = {
+  season: Season;
+  today: GameDate;
+  /** The sandbox player the admin is playing as, or null for their own copy. */
+  actingAs: string | null;
+};
+
+/**
+ * The test round the signed-in admin is playing, or null when they're in the
+ * real game. Only real admins can be in one, and only once a round has started.
+ */
+export const testRound = cache(async (): Promise<TestRound | null> => {
+  const store = await cookies();
+  if (store.get(TEST_COOKIE)?.value !== "1") return null;
+  const real = await realMe();
+  if (!real.is_admin) return null;
+  const { data, error } = await dataClient("sandbox").from("settings").select("*").maybeSingle();
+  if (error || !data) return null;
+  return {
+    season: { start: data.season_start, days: data.season_days },
+    today: data.today,
+    actingAs: data.acting_as,
+  };
+});
+
+/**
+ * The database the game reads and writes for this request: the sandbox during a
+ * test round, the real tables otherwise. All game data goes through this.
+ */
+export async function gameDb() {
+  return (await testRound()) ? dataClient("sandbox") : dataClient();
+}
+
+/** The season and current game day, which a test round sets by hand. */
+export async function gameClock(): Promise<{ season: Season; today: GameDate }> {
+  const round = await testRound();
+  return round ? { season: round.season, today: round.today } : { season: seasonFromEnv(), today: gameDateOf(new Date()) };
+}
+
+/**
+ * The signed-in player. During a test round it's the sandbox player the admin is
+ * playing as.
+ */
+export const requireMe = cache(async (): Promise<Me> => {
+  const round = await testRound();
+  if (!round) return realMe();
+  const real = await realMe();
+  const db = dataClient("sandbox");
+  const query = db.from("players").select("*");
+  const { data, error } = await (round.actingAs
+    ? query.eq("id", round.actingAs)
+    : query.eq("email", real.email)
+  ).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("This test round has no player for you. Start a new one on the Test page.");
+  return data as PlayerRow;
+});
+
 export async function requireAdmin(): Promise<Me> {
   const me = await requireMe();
+  if (!me.is_admin) redirect("/");
+  return me;
+}
+
+/** A real admin, whatever player they're playing as in a test round. */
+export async function requireRealAdmin(): Promise<Me> {
+  const me = await realMe();
   if (!me.is_admin) redirect("/");
   return me;
 }
@@ -90,7 +159,7 @@ export type Game = {
 };
 
 async function loadDayThemes(): Promise<Map<GameDate, DayThemeRow>> {
-  const { data, error } = await dataClient().from("day_themes").select("game_date, theme_text, theme_id");
+  const { data, error } = await (await gameDb()).from("day_themes").select("game_date, theme_text, theme_id");
   if (error) throw error;
   return new Map(
     data.map((r) => [r.game_date, { date: r.game_date, text: r.theme_text, themeId: r.theme_id }]),
@@ -120,7 +189,7 @@ async function drawDueThemes(
     rows.push({ game_date: date, theme_text: theme.text, theme_id: theme.id });
   }
   if (rows.length === 0) return saved;
-  const { error } = await dataClient()
+  const { error } = await (await gameDb())
     .from("day_themes")
     .upsert(rows, { onConflict: "game_date", ignoreDuplicates: true });
   if (error) throw error;
@@ -129,7 +198,7 @@ async function drawDueThemes(
 
 /** Everything in the game. A season is at most a few thousand rows, so we load it all. */
 export async function loadGame(): Promise<Game> {
-  const db = dataClient();
+  const db = await gameDb();
   const [players, submissions, ratings, songs, pool, savedThemes, availability] = await Promise.all([
     db.from("players").select("*").order("display_name"),
     db.from("submissions").select("id, player_id, game_date, round, song_id"),
@@ -143,8 +212,7 @@ export async function loadGame(): Promise<Game> {
   if (availability.error) throw availability.error;
   for (const r of [players, submissions, ratings, songs]) if (r.error) throw r.error;
 
-  const season = seasonFromEnv();
-  const today = gameDateOf(new Date());
+  const { season, today } = await gameClock();
   const playerRows = players.data as PlayerRow[];
   const open = openDates(season, today);
   const themePool: ThemeRow[] = pool.data.map((t) => ({

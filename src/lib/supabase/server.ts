@@ -24,10 +24,11 @@ export async function authClient() {
 /**
  * A client with full database access. Game rules are enforced in the server code
  * that calls it, and the tables have no public policies, so it must never reach
- * the browser.
+ * the browser. The "sandbox" schema holds admin test rounds (see lib/test-mode.ts).
  */
-export function dataClient() {
+export function dataClient(schema: "public" | "sandbox" = "public") {
   return createClient(supabaseUrl(), supabaseSecretKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
+    db: { schema },
   });
 }
