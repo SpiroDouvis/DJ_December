@@ -1,5 +1,5 @@
-import { removePlayer, removeTheme, setAdmin, setDayTheme } from "@/app/actions";
-import { AddThemeForm } from "@/components/AddThemeForm";
+import Link from "next/link";
+import { removePlayer, setAdmin, setDayTheme } from "@/app/actions";
 import { AddPlayerForm } from "@/components/AddPlayerForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,7 +93,7 @@ export default async function AdminPage() {
             Daily themes
           </CardTitle>
           <CardDescription>
-          Every second day is themed. A themed day&apos;s theme is drawn from the pool when the day opens at 5 AM
+          Every second day is themed. A themed day&apos;s theme is drawn from players&apos; ideas when the day opens at 5 AM
           MST, and players only see it then. You can set, redraw or clear any day&apos;s theme here, ahead of time
           or on the day.
           </CardDescription>
@@ -189,25 +189,14 @@ export default async function AdminPage() {
             Theme pool
           </CardTitle>
           <CardDescription>
-            {game.themePool.length} themes. Ones already used are only drawn again once every theme has been used.
+            The pool is made of players&apos; ideas: {game.themePool.length} so far. Random picks use it, preferring
+            ideas not used yet. As admin you can remove any idea on the{" "}
+            <Link href="/ideas" className="text-violet-200 underline hover:text-white">
+              Ideas page
+            </Link>
+            .
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <AddThemeForm />
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {game.themePool.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 rounded-lg border bg-background/40 py-1.5 pr-1.5 pl-3 text-sm">
-                <span className="min-w-0 truncate">{t.text}</span>
-                <form action={removeTheme}>
-                  <input type="hidden" name="id" value={t.id} />
-                  <Button type="submit" size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-destructive" aria-label={`Remove ${t.text}`}>
-                    <Trash2 />
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
       </Card>
     </>
   );

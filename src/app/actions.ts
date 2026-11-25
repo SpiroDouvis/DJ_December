@@ -187,22 +187,37 @@ export async function setAdmin(form: FormData) {
 
 const themeText = (value: FormDataEntryValue | null) => String(value ?? "").trim().slice(0, 80);
 
+/** Any player can add theme ideas to the pool. */
 export async function addTheme(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireAdmin();
+  const me = await requireMe();
   const text = themeText(form.get("text"));
-  if (!text) return { error: "Type a theme." };
-  const { error } = await dataClient().from("themes").insert({ text });
+  if (!text) return { error: "Type a theme idea." };
+  const { error } = await dataClient().from("themes").insert({ text, submitted_by: me.id });
   if (error) {
-    if (error.code === "23505") return { error: "That theme is already in the pool." };
+    if (error.code === "23505") return { error: "That idea is already in the pool." };
     throw error;
   }
   revalidatePath("/", "layout");
   return { ok: `Added "${text}".` };
 }
 
+/** Players can take back their own ideas until one is used; admins can remove any. */
 export async function removeTheme(form: FormData) {
-  await requireAdmin();
-  const { error } = await dataClient().from("themes").delete().eq("id", String(form.get("id") ?? ""));
+  const me = await requireMe();
+  const id = String(form.get("id") ?? "");
+  const db = dataClient();
+  if (!me.is_admin) {
+    const { data: theme, error } = await db.from("themes").select("submitted_by").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!theme || theme.submitted_by !== me.id) throw new Error("You can only remove your own ideas.");
+    const { count, error: usedError } = await db
+      .from("day_themes")
+      .select("game_date", { count: "exact", head: true })
+      .eq("theme_id", id);
+    if (usedError) throw usedError;
+    if (count) throw new Error("That idea has already been picked for a day.");
+  }
+  const { error } = await db.from("themes").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/", "layout");
 }
@@ -226,7 +241,7 @@ export async function setDayTheme(form: FormData) {
       const game = await loadGame();
       // Counting this day's current theme as used means a redraw gives a different one.
       const theme = drawTheme(game.themePool, game.dayThemeRows.values());
-      if (!theme) throw new Error("The theme pool is empty.");
+      if (!theme) throw new Error("The theme pool is empty. Players can add ideas on the Ideas page.");
       row = { theme_text: theme.text, theme_id: theme.id };
     } else {
       const text = themeText(form.get("text"));

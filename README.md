@@ -19,8 +19,10 @@ the highest total wins the day.
   the other players rate them. If everyone tied, the round repeats with everyone. Tiebreaks
   repeat until there's one winner.
 
-- Every second day has a theme, drawn at random from a pool when the day opens. Admins
-  can edit the pool and set, redraw or clear any day's theme on the Admin page.
+- Every second day has a theme, drawn at random when the day opens from the pool of
+  theme ideas players add on the Ideas page. Everyone can see the pool and who added
+  each idea. Admins can remove any idea and set, redraw or clear any day's theme on the
+  Admin page.
 
 - The Schedule tab lets players queue songs ahead for days without a theme (each goes in
   when its day opens) and mark when they're free or busy to rate. A busy note shows next

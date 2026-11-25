@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { datesNeedingDraw, drawTheme, isDefaultThemed, isThemed, type DayThemeRow } from "@/lib/themes";
+import { datesNeedingDraw, drawTheme, isDefaultThemed, isThemed, usedOn, type DayThemeRow } from "@/lib/themes";
 
 const season = { start: "2026-12-01", days: 31 };
 
@@ -52,5 +52,17 @@ describe("datesNeedingDraw", () => {
     ]);
     const open = ["2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04"];
     expect(datesNeedingDraw(season, open, saved)).toEqual(["2026-12-04"]);
+  });
+});
+
+describe("usedOn", () => {
+  it("only reports ideas used on days that have opened", () => {
+    const saved = new Map<string, DayThemeRow>([
+      ["2026-12-02", { date: "2026-12-02", text: "A", themeId: "a" }],
+      ["2026-12-03", { date: "2026-12-03", text: "Custom", themeId: null }],
+      ["2026-12-06", { date: "2026-12-06", text: "B", themeId: "b" }],
+    ]);
+    const used = usedOn(["2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04"], saved);
+    expect([...used]).toEqual([["a", "2026-12-02"]]);
   });
 });

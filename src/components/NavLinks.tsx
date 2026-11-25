@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { CalendarDays, ChartColumn, Disc3, Shield } from "lucide-react";
+import { CalendarDays, ChartColumn, Disc3, Lightbulb, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/", label: "Today", icon: Disc3 },
   { href: "/schedule", label: "Schedule", icon: CalendarDays },
+  { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/stats", label: "Stats", icon: ChartColumn },
   { href: "/admin", label: "Admin", icon: Shield, admin: true },
 ];
