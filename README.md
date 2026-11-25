@@ -60,5 +60,17 @@ npm run dev     # http://localhost:3000
 npm test        # game rule tests
 ```
 
+### Test rounds
+
+Admins get a **Test** tab for playing a pretend game before the real one: pick how many fake
+players and days, then move the clock a day at a time, switch which player you're playing as,
+and have the others send songs and rate (randomly, or all 7s to force a tiebreak). Every page
+shows the test game while you're in it, with a banner on top, and only for you.
+
+Test rounds live in a separate `sandbox` schema, so they never touch real players, songs,
+ratings, day themes or theme ideas (ideas are copied in, so drawing one in a test doesn't mark
+the real one as used). To turn it on, run the `test_sandbox` migration and add `sandbox` to the
+exposed schemas under Project Settings > Data API in Supabase.
+
 To try a trial season before December, set `SEASON_START` (for example `2026-11-20`) and
 `SEASON_DAYS`.

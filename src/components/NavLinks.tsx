@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { CalendarDays, ChartColumn, Disc3, Lightbulb, Shield } from "lucide-react";
+import { CalendarDays, ChartColumn, Disc3, FlaskConical, Lightbulb, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -12,14 +12,15 @@ const LINKS = [
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/stats", label: "Stats", icon: ChartColumn },
   { href: "/admin", label: "Admin", icon: Shield, admin: true },
+  { href: "/test", label: "Test", icon: FlaskConical, test: true },
 ];
 
-export function NavLinks({ isAdmin }: { isAdmin: boolean }) {
+export function NavLinks({ isAdmin, canTest }: { isAdmin: boolean; canTest: boolean }) {
   const path = usePathname();
   const active = (href: string) => (href === "/" ? path === "/" || path.startsWith("/day/") : path.startsWith(href));
   return (
     <nav className="isolate flex items-center gap-1 rounded-full border bg-background/40 p-1">
-      {LINKS.filter((l) => !l.admin || isAdmin).map(({ href, label, icon: Icon }) => (
+      {LINKS.filter((l) => (!l.admin || isAdmin) && (!l.test || canTest)).map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
           href={href}
