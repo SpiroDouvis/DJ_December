@@ -27,8 +27,9 @@ import { addDays, formatDate, seasonFromEnv } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-export default async function TestPage() {
+export default async function TestPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireRealAdmin();
+  const { error: actionError } = await searchParams;
   const saved = await dataClient("sandbox").from("settings").select("*").maybeSingle();
   const round = await testRound();
 
@@ -47,6 +48,8 @@ export default async function TestPage() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      {actionError ? <ProblemCard title="That didn't work" message={actionError} /> : null}
 
       {saved.error ? (
         <Card className="border-warning/50">
@@ -130,9 +133,51 @@ export default async function TestPage() {
   );
 }
 
+function ProblemCard({ title, message }: { title: string; message: string }) {
+  return (
+    <Card className="border-destructive/50">
+      <CardHeader>
+        <CardTitle>
+          <ShieldAlert className="size-5 text-destructive" aria-hidden />
+          {title}
+        </CardTitle>
+        <CardDescription className="break-words">{message}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
+
 async function RunningRound() {
-  const me = await requireMe();
-  const game = await loadGame();
+  let me, game;
+  try {
+    me = await requireMe();
+    game = await loadGame();
+  } catch (e) {
+    console.error("Loading the test round failed", e);
+    const message =
+      e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : String(e);
+    return (
+      <>
+        <ProblemCard title="The test round couldn't load" message={message} />
+        <Card>
+          <CardContent className="flex flex-wrap gap-2">
+            <form action={leaveTestMode}>
+              <Button type="submit" variant="secondary">
+                <LogOut />
+                Back to the real game
+              </Button>
+            </form>
+            <form action={wipeTestRound}>
+              <Button type="submit" variant="destructive">
+                <Trash2 />
+                Delete test data
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? "?";
   const last = addDays(game.season.start, game.season.days - 1);
   const dayNumber = game.open.length;
