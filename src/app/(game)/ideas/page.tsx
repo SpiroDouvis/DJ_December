@@ -4,7 +4,7 @@ import { ThemeIdeaForm } from "@/components/ThemeIdeaForm";
 import { Stagger, StaggerItem } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadGame, requireMe } from "@/lib/data";
 import { usedOn } from "@/lib/themes";
 import { formatDate } from "@/lib/time";
@@ -30,10 +30,6 @@ export default async function IdeasPage() {
           <Lightbulb className="size-5 text-violet-300" aria-hidden />
           Theme ideas
         </CardTitle>
-        <CardDescription>
-          Every second day gets a theme, drawn at random from these ideas when the day opens at 5 AM MST. Add as many
-          as you like, before December starts or during the game. Ideas that haven&apos;t come up yet are drawn first.
-        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <ThemeIdeaForm />

@@ -7,6 +7,7 @@ import { Hourglass, Trophy } from "lucide-react";
 import { ResultBanner, RevealRow, RevealRows, Stagger, StaggerItem, ThemeReveal } from "./motion";
 import { RatingForm } from "./RatingForm";
 import { SongCard } from "./SongCard";
+import { WinConfetti } from "./WinConfetti";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableHead, TableHeader, TableRow } from "./ui/table";
 
@@ -142,10 +143,13 @@ export function RoundResults({
           Tie between {names(status.leaders.map((s) => nameOf(s.playerId)))}. On to a tiebreak!
         </ResultBanner>
       ) : isWinningRound ? (
-        <ResultBanner kind="win">
-          {nameOf(status.leaders[0].playerId)} wins {formatDate(status.date)}
-          {status.round > 1 ? " in the tiebreak" : ""}!
-        </ResultBanner>
+        <>
+          <ResultBanner kind="win">
+            {nameOf(status.leaders[0].playerId)} wins {formatDate(status.date)}
+            {status.round > 1 ? " in the tiebreak" : ""}!
+          </ResultBanner>
+          <WinConfetti id={`${status.date}:${status.leaders[0].id}`} />
+        </>
       ) : null}
 
       <Table>
