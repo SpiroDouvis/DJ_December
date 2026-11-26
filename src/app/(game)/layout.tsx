@@ -3,6 +3,7 @@ import { ChevronRight, FlaskConical, Headphones, LogOut } from "lucide-react";
 import { setService, signOut } from "@/app/actions";
 import { leaveTestMode, setTestDay } from "@/app/test-actions";
 import { Brand } from "@/components/Brand";
+import { MusicToggle } from "@/components/MusicToggle";
 import { NavLinks } from "@/components/NavLinks";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -69,6 +70,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
               </span>
               <span className="hidden md:inline">{me.display_name}</span>
             </span>
+            <MusicToggle />
             <form action={signOut}>
               <Button type="submit" variant="ghost" size="sm" aria-label="Sign out">
                 <LogOut />
