@@ -7,7 +7,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <CenterCard logo>
       <h1 className="sr-only">DJ December</h1>
-      <p className="text-muted-foreground">A song a day, rated by your friends.</p>
       <form action={signInWithGoogle} className="w-full">
         <Button type="submit" size="lg" className="w-full">
           <svg viewBox="0 0 24 24" aria-hidden className="size-5">
