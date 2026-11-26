@@ -4,8 +4,8 @@ import { setService, signOut } from "@/app/actions";
 import { leaveTestMode, setTestDay } from "@/app/test-actions";
 import { Brand } from "@/components/Brand";
 import { LiveRefresh } from "@/components/LiveRefresh";
-import { MusicToggle } from "@/components/MusicToggle";
 import { NavLinks } from "@/components/NavLinks";
+import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { realMe, requireMe, testRound } from "@/lib/data";
@@ -56,8 +56,13 @@ export default async function GameLayout({ children }: { children: React.ReactNo
           <Link href="/" className="no-underline">
             <Brand />
           </Link>
+          {/* Desktop: just the initial bubble in the top right, with the rest in its dropdown. */}
+          <div className="ml-auto hidden self-start md:block">
+            <UserMenu name={me.display_name} service={me.service} />
+          </div>
           <NavLinks isAdmin={me.is_admin} canTest={real.is_admin} />
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Phones keep the full bar. */}
+          <div className="ml-auto flex flex-wrap items-center gap-2 md:hidden">
             <form action={setService} className="flex items-center gap-1.5">
               <Headphones className="size-4 text-muted-foreground" aria-hidden />
               <NativeSelect name="service" defaultValue={me.service} aria-label="Listen on" className="h-8 text-xs">
@@ -72,9 +77,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
               <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-primary to-fuchsia-500 text-xs font-bold text-white">
                 {me.display_name.slice(0, 1).toUpperCase()}
               </span>
-              <span className="hidden md:inline">{me.display_name}</span>
             </span>
-            <MusicToggle />
             <form action={signOut}>
               <Button type="submit" variant="ghost" size="sm" aria-label="Sign out">
                 <LogOut />
