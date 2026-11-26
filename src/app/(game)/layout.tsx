@@ -3,10 +3,13 @@ import { ChevronRight, FlaskConical, Headphones, LogOut } from "lucide-react";
 import { setService, signOut } from "@/app/actions";
 import { leaveTestMode, setTestDay } from "@/app/test-actions";
 import { Brand } from "@/components/Brand";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { NavLinks } from "@/components/NavLinks";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { realMe, requireMe, testRound } from "@/lib/data";
+import { liveChannel } from "@/lib/live";
+import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase/env";
 import { formatDate } from "@/lib/time";
 
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +18,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
   const round = await testRound();
   return (
     <>
+      <LiveRefresh url={supabaseUrl()} publishableKey={supabasePublishableKey()} channel={liveChannel(round !== null)} />
       {round ? (
         <div className="border-b border-warning/40 bg-warning/15 text-sm">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2">

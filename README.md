@@ -19,14 +19,15 @@ the highest total wins the day.
   the other players rate them. If everyone tied, the round repeats with everyone. Tiebreaks
   repeat until there's one winner.
 
-- Every second day has a theme, drawn at random when the day opens from the pool of
-  theme ideas players add on the Ideas page. Everyone can see the pool and who added
-  each idea. Admins can remove any idea and set, redraw or clear any day's theme on the
-  Admin page.
+- Themes come from the pool of ideas players add on the Ideas page. Admins assign them to
+  days on the Calendar, by dragging ideas onto days or tapping a day and picking from a
+  list. Only days an admin themes have a theme, and everyone can see them ahead of time.
 
-- The Schedule tab lets players queue songs ahead for days without a theme (each goes in
-  when its day opens) and mark when they're free or busy to rate. A busy note shows next
-  to their name when a day is waiting on them.
+- The Calendar tab shows the whole season and updates live. Days a player still owes a
+  song or ratings for are outlined in red with a "!", and tapping one lets them catch up.
+  Tapping a past day shows the winner and every rating; tapping a future day lets them
+  queue a song for it (it goes in when the day opens). Giving a day a new theme drops
+  songs already queued for it.
 
 - The Stats tab shows wins, average ratings given and received, a grid of who rates whom,
   and each player's biggest fan and toughest critic. Only revealed days count.
@@ -35,7 +36,9 @@ the highest total wins the day.
 
 - [Next.js](https://nextjs.org) (App Router), deployed to Netlify or Vercel.
 - [Supabase](https://supabase.com) for Postgres and Google sign-in.
-- The browser never talks to the database. Server code reads and writes with the secret
+- Pages listen on a public Supabase Realtime broadcast channel that only ever says
+  "something changed", then re-fetch from the server.
+- The browser never reads the database. Server code reads and writes with the secret
   key, and every table has row level security turned on with no public policies.
 
 ## Setup

@@ -1,15 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { gameClock, gameDb, loadGame, requireAdmin, requireMe } from "@/lib/data";
 import { dayOutcome, isValidScore, owedDates } from "@/lib/game";
 import { resolveSong, SongLinkError } from "@/lib/music";
+import { gameChanged } from "@/lib/live";
 import { authClient } from "@/lib/supabase/server";
 import { queueBlocker } from "@/lib/schedule";
 import { drawTheme } from "@/lib/themes";
-import { formatDate, isGameDate } from "@/lib/time";
+import { formatDate, isGameDate, seasonDates } from "@/lib/time";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -50,7 +50,7 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
       return { error: "Someone has already rated that song, so it can't be changed." };
     }
   } else if (round === 1 && date > game.today) {
-    const blocker = queueBlocker(date, game.today, game.season, me.joined_on, game.dayThemeRows);
+    const blocker = queueBlocker(date, game.today, game.season, me.joined_on);
     if (blocker) return { error: blocker };
   } else if (round === 1) {
     const owed = owedDates(me.id, game.open, game.players, game.submissions);
@@ -102,7 +102,7 @@ export async function submitSong(_prev: FormState, form: FormData): Promise<Form
     throw error;
   }
 
-  revalidatePath("/", "layout");
+  await gameChanged();
   const what =
     round > 1
       ? `the ${formatDate(date)} tiebreak`
@@ -135,7 +135,7 @@ export async function rateSong(form: FormData) {
       { onConflict: "submission_id,rater_id" },
     );
   if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
 
 export async function setService(form: FormData) {
@@ -143,7 +143,7 @@ export async function setService(form: FormData) {
   const service = form.get("service") === "apple" ? "apple" : "spotify";
   const { error } = await (await gameDb()).from("players").update({ service }).eq("id", me.id);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
 
 export async function addPlayer(_prev: FormState, form: FormData): Promise<FormState> {
@@ -162,7 +162,7 @@ export async function addPlayer(_prev: FormState, form: FormData): Promise<FormS
     if (error.code === "23505") return { error: "That email is already playing." };
     throw error;
   }
-  revalidatePath("/", "layout");
+  await gameChanged();
   return { ok: `Added ${name}. They can sign in with Google using ${email}.` };
 }
 
@@ -172,7 +172,7 @@ export async function removePlayer(form: FormData) {
   if (id === me.id) throw new Error("You can't remove yourself.");
   const { error } = await (await gameDb()).from("players").delete().eq("id", id);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
 
 export async function setAdmin(form: FormData) {
@@ -182,7 +182,7 @@ export async function setAdmin(form: FormData) {
   if (id === me.id && !isAdmin) throw new Error("You can't remove your own admin access.");
   const { error } = await (await gameDb()).from("players").update({ is_admin: isAdmin }).eq("id", id);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
 
 const themeText = (value: FormDataEntryValue | null) => String(value ?? "").trim().slice(0, 80);
@@ -197,7 +197,7 @@ export async function addTheme(_prev: FormState, form: FormData): Promise<FormSt
     if (error.code === "23505") return { error: "That idea is already in the pool." };
     throw error;
   }
-  revalidatePath("/", "layout");
+  await gameChanged();
   return { ok: `Added "${text}".` };
 }
 
@@ -219,48 +219,90 @@ export async function removeTheme(form: FormData) {
   }
   const { error } = await db.from("themes").delete().eq("id", id);
   if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
 
-/** Sets, redraws, clears or resets one day's theme. */
-export async function setDayTheme(form: FormData) {
+type ThemeChoice =
+  | { kind: "idea"; id: string }
+  | { kind: "random" }
+  | { kind: "custom"; text: string }
+  | { kind: "none" };
+
+/**
+ * Gives a day a theme (an idea from the pool, a random unused idea, or custom
+ * text) or takes its theme away. Only admins can. Songs already queued for a day
+ * that hasn't opened were picked for its old theme, so a new theme drops them.
+ */
+async function applyDayTheme(date: string, choice: ThemeChoice): Promise<FormState> {
   await requireAdmin();
-  const date = String(form.get("date") ?? "");
-  const mode = String(form.get("mode") ?? "");
-  if (!isGameDate(date)) throw new Error("Unknown day.");
+  if (!isGameDate(date)) return { error: "Unknown day." };
+  const game = await loadGame();
+  if (!seasonDates(game.season).includes(date)) return { error: "That day isn't part of the season." };
   const db = await gameDb();
 
-  if (mode === "reset") {
-    const { error } = await db.from("day_themes").delete().eq("game_date", date);
-    if (error) throw error;
+  let row: { theme_text: string; theme_id: string | null } | null;
+  if (choice.kind === "none") {
+    row = null;
+  } else if (choice.kind === "idea") {
+    const idea = game.themePool.find((t) => t.id === choice.id);
+    if (!idea) return { error: "That idea isn't in the pool any more." };
+    row = { theme_text: idea.text, theme_id: idea.id };
+  } else if (choice.kind === "random") {
+    // Counting this day's current theme as used means a redraw gives a different one.
+    const idea = drawTheme(game.themePool, game.dayThemeRows.values());
+    if (!idea) return { error: "The theme pool is empty. Players can add ideas on the Ideas page." };
+    row = { theme_text: idea.text, theme_id: idea.id };
   } else {
-    let row: { theme_text: string | null; theme_id: string | null };
-    if (mode === "none") {
-      row = { theme_text: null, theme_id: null };
-    } else if (mode === "random") {
-      const game = await loadGame();
-      // Counting this day's current theme as used means a redraw gives a different one.
-      const theme = drawTheme(game.themePool, game.dayThemeRows.values());
-      if (!theme) throw new Error("The theme pool is empty. Players can add ideas on the Ideas page.");
-      row = { theme_text: theme.text, theme_id: theme.id };
-    } else {
-      const text = themeText(form.get("text"));
-      if (!text) throw new Error("Type a theme.");
-      row = { theme_text: text, theme_id: null };
-    }
-    const { error } = await db.from("day_themes").upsert({ game_date: date, ...row }, { onConflict: "game_date" });
-    if (error) throw error;
-    // Queued songs were picked without the theme, so a newly themed future day drops them.
-    if (row.theme_text !== null && date > (await gameClock()).today) {
-      const { error: dropError } = await db
-        .from("submissions")
-        .delete()
-        .eq("game_date", date)
-        .eq("round", 1);
-      if (dropError) throw dropError;
-    }
+    const text = themeText(choice.text);
+    if (!text) return { error: "Type a theme." };
+    row = { theme_text: text, theme_id: null };
   }
-  revalidatePath("/", "layout");
+
+  const before = game.themes.get(date) ?? null;
+  const { error } = row
+    ? await db.from("day_themes").upsert({ game_date: date, ...row }, { onConflict: "game_date" })
+    : await db.from("day_themes").delete().eq("game_date", date);
+  if (error) throw error;
+
+  let dropped = 0;
+  if (row && row.theme_text !== before && date > game.today) {
+    const { data, error: dropError } = await db
+      .from("submissions")
+      .delete()
+      .eq("game_date", date)
+      .eq("round", 1)
+      .select("id");
+    if (dropError) throw dropError;
+    dropped = data.length;
+  }
+  await gameChanged();
+  const what = row ? `${formatDate(date)} is now "${row.theme_text}".` : `${formatDate(date)} has no theme now.`;
+  return {
+    ok: dropped
+      ? `${what} ${dropped} queued ${dropped === 1 ? "song was" : "songs were"} removed.`
+      : what,
+  };
+}
+
+/** The theme picker form on a calendar day. */
+export async function setDayTheme(_prev: FormState, form: FormData): Promise<FormState> {
+  const date = String(form.get("date") ?? "");
+  const pick = String(form.get("pick") ?? "");
+  if (pick === "none") return applyDayTheme(date, { kind: "none" });
+  if (pick === "random") return applyDayTheme(date, { kind: "random" });
+  if (pick === "custom") return applyDayTheme(date, { kind: "custom", text: String(form.get("text") ?? "") });
+  if (pick.startsWith("idea:")) return applyDayTheme(date, { kind: "idea", id: pick.slice(5) });
+  return { error: "Pick a theme." };
+}
+
+/** Dropping an idea onto a calendar day. */
+export async function assignIdea(date: string, ideaId: string): Promise<FormState> {
+  return applyDayTheme(String(date), { kind: "idea", id: String(ideaId) });
+}
+
+/** Dragging a theme off a calendar day. */
+export async function clearDayTheme(date: string): Promise<FormState> {
+  return applyDayTheme(String(date), { kind: "none" });
 }
 
 export async function removeQueuedSong(form: FormData) {
@@ -276,25 +318,5 @@ export async function removeQueuedSong(form: FormData) {
     .eq("game_date", date)
     .eq("round", 1);
   if (error) throw error;
-  revalidatePath("/", "layout");
-}
-
-export async function setAvailability(form: FormData) {
-  const me = await requireMe();
-  const date = String(form.get("date") ?? "");
-  const status = String(form.get("status") ?? "");
-  const note = String(form.get("note") ?? "").trim().slice(0, 60) || null;
-  if (!isGameDate(date)) throw new Error("Unknown day.");
-  const db = await gameDb();
-  const { error } =
-    status === "available" || status === "busy"
-      ? await db
-          .from("availability")
-          .upsert(
-            { player_id: me.id, game_date: date, status, note, updated_at: new Date().toISOString() },
-            { onConflict: "player_id,game_date" },
-          )
-      : await db.from("availability").delete().eq("player_id", me.id).eq("game_date", date);
-  if (error) throw error;
-  revalidatePath("/", "layout");
+  await gameChanged();
 }
