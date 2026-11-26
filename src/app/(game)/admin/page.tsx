@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { removePlayer, setAdmin, setDayTheme } from "@/app/actions";
+import { removePlayer, setAdmin } from "@/app/actions";
 import { AddPlayerForm } from "@/components/AddPlayerForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Ban, Dices, Library, Sparkles, Trash2, Undo2, UserPlus, Users } from "lucide-react";
+import { Library, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { loadGame, requireAdmin } from "@/lib/data";
-import { isDefaultThemed } from "@/lib/themes";
-import { formatDate, seasonDates } from "@/lib/time";
+import { formatDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -93,93 +91,14 @@ export default async function AdminPage() {
             Daily themes
           </CardTitle>
           <CardDescription>
-          Every second day is themed. A themed day&apos;s theme is drawn from players&apos; ideas when the day opens at 5 AM
-          MST, and players only see it then. You can set, redraw or clear any day&apos;s theme here, ahead of time
-          or on the day.
+            Only days you give a theme are themed. Assign themes on the{" "}
+            <Link href="/calendar" className="text-violet-200 underline hover:text-white">
+              Calendar
+            </Link>
+            : drag ideas onto days, or tap a day and pick from its list. Everyone sees the calendar update live.{" "}
+            {game.themes.size} {game.themes.size === 1 ? "day has" : "days have"} a theme so far.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Day</TableHead>
-                <TableHead>Theme</TableHead>
-                <TableHead>Change it</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {seasonDates(game.season).map((date) => {
-                const row = game.dayThemeRows.get(date);
-                const opened = game.open.includes(date);
-                const current = row
-                  ? (row.text ?? "No theme")
-                  : isDefaultThemed(game.season, date)
-                    ? opened
-                      ? "Waiting to be drawn"
-                      : "Drawn at 5 AM"
-                    : "No theme";
-                return (
-                  <TableRow key={date}>
-                    <TableCell>{formatDate(date)}</TableCell>
-                    <TableCell>
-                      {row?.text ? (
-                        <Badge>{current}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">{current}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <form action={setDayTheme} className="flex items-center gap-1.5">
-                          <input type="hidden" name="date" value={date} />
-                          <input type="hidden" name="mode" value="set" />
-                          <Input
-                            name="text"
-                            required
-                            maxLength={80}
-                            placeholder="Custom theme"
-                            aria-label={`Theme for ${formatDate(date)}`}
-                            className="h-8 w-44 text-xs"
-                          />
-                          <Button type="submit" size="sm">
-                            Set
-                          </Button>
-                        </form>
-                        <form action={setDayTheme}>
-                          <input type="hidden" name="date" value={date} />
-                          <input type="hidden" name="mode" value="random" />
-                          <Button type="submit" size="sm" variant="secondary">
-                            <Dices />
-                            Random
-                          </Button>
-                        </form>
-                        <form action={setDayTheme}>
-                          <input type="hidden" name="date" value={date} />
-                          <input type="hidden" name="mode" value="none" />
-                          <Button type="submit" size="sm" variant="secondary">
-                            <Ban />
-                            No theme
-                          </Button>
-                        </form>
-                        {row ? (
-                          <form action={setDayTheme}>
-                            <input type="hidden" name="date" value={date} />
-                            <input type="hidden" name="mode" value="reset" />
-                            <Button type="submit" size="sm" variant="ghost">
-                              <Undo2 />
-                              Reset
-                            </Button>
-                          </form>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <CardDescription>Reset puts a day back to the default: every second day gets a random theme.</CardDescription>
-        </CardContent>
       </Card>
 
       <Card>
@@ -189,7 +108,7 @@ export default async function AdminPage() {
             Theme pool
           </CardTitle>
           <CardDescription>
-            The pool is made of players&apos; ideas: {game.themePool.length} so far. Random picks use it, preferring
+            The pool is made of players&apos; ideas: {game.themePool.length} so far. The calendar's Random pick prefers
             ideas not used yet. As admin you can remove any idea on the{" "}
             <Link href="/ideas" className="text-violet-200 underline hover:text-white">
               Ideas page

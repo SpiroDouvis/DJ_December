@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadGame, requireMe } from "@/lib/data";
-import { usedOn } from "@/lib/themes";
+import { daysByIdea } from "@/lib/themes";
 import { formatDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +16,9 @@ export default async function IdeasPage() {
   const game = await loadGame();
   const nameOf = (id: string | null) =>
     id === me.id ? "You" : (game.players.find((p) => p.id === id)?.name ?? "A former player");
-  // Only days that have opened, so nobody learns a future day's theme from this page.
-  const revealed = usedOn(game.open, game.dayThemeRows);
-  // Every saved pick, to stop a player removing an idea already chosen for a day.
-  const picked = new Set([...game.dayThemeRows.values()].map((r) => r.themeId).filter(Boolean));
-  const unused = game.themePool.filter((t) => !revealed.has(t.id)).length;
+  // Themes are public on the calendar, so every assigned day shows here too.
+  const days = daysByIdea(game.dayThemeRows);
+  const unused = game.themePool.filter((t) => !days.has(t.id)).length;
   const mine = game.themePool.filter((t) => t.submittedBy === me.id).length;
 
   return (
@@ -34,8 +32,8 @@ export default async function IdeasPage() {
       <CardContent className="flex flex-col gap-4">
         <ThemeIdeaForm />
         <p className="text-sm text-muted-foreground">
-          {game.themePool.length} {game.themePool.length === 1 ? "idea" : "ideas"} in the pool, {unused} not used
-          yet. {mine} {mine === 1 ? "is" : "are"} yours.
+          {game.themePool.length} {game.themePool.length === 1 ? "idea" : "ideas"} in the pool, {unused} not on the
+          calendar yet. {mine} {mine === 1 ? "is" : "are"} yours.
         </p>
         {game.themePool.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
@@ -44,8 +42,8 @@ export default async function IdeasPage() {
         ) : (
           <Stagger className="grid gap-2 sm:grid-cols-2">
             {game.themePool.map((t) => {
-              const usedDate = revealed.get(t.id);
-              const canRemove = me.is_admin || (t.submittedBy === me.id && !picked.has(t.id));
+              const onDays = days.get(t.id) ?? [];
+              const canRemove = me.is_admin || (t.submittedBy === me.id && onDays.length === 0);
               return (
                 <StaggerItem
                   key={t.id}
@@ -57,7 +55,9 @@ export default async function IdeasPage() {
                     </p>
                     <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                       by {nameOf(t.submittedBy)}
-                      {usedDate ? <Badge variant="secondary">Used {formatDate(usedDate)}</Badge> : null}
+                      {onDays.length ? (
+                        <Badge variant="secondary">On {onDays.map(formatDate).join(", ")}</Badge>
+                      ) : null}
                     </p>
                   </div>
                   {canRemove ? (

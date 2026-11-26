@@ -6,6 +6,7 @@ import { Stagger, StaggerItem } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlarmClock, ChevronRight, Disc3, ListMusic, PartyPopper, Swords, Trophy } from "lucide-react";
+import { dayHref } from "@/lib/calendar";
 import { loadGame, requireMe } from "@/lib/data";
 import { dayOutcome, owedDates, owedTiebreaks } from "@/lib/game";
 import { formatDate } from "@/lib/time";
@@ -32,11 +33,11 @@ export default async function Home() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            You can already{" "}
-            <Link href="/schedule" className="text-violet-200 underline hover:text-white">
-              queue songs
-            </Link>{" "}
-            for days without a theme and mark when you&apos;re free to rate, and{" "}
+            You can already check the themes and queue songs on the{" "}
+            <Link href="/calendar" className="text-violet-200 underline hover:text-white">
+              calendar
+            </Link>
+            , and{" "}
             <Link href="/ideas" className="text-violet-200 underline hover:text-white">
               add theme ideas
             </Link>{" "}
@@ -132,10 +133,10 @@ export default async function Home() {
           {queuedCount > 0
             ? `You have ${queuedCount} ${queuedCount === 1 ? "song" : "songs"} queued for later days. `
             : ""}
-          <Link href="/schedule" className="text-violet-200 underline hover:text-white">
+          <Link href="/calendar" className="text-violet-200 underline hover:text-white">
             Queue songs ahead
           </Link>{" "}
-          for days without a theme.
+          from the calendar.
         </p>
         </CardContent>
       </Card>
@@ -155,7 +156,7 @@ export default async function Home() {
             {decided.map((o) => (
               <StaggerItem key={o.date}>
                 <Link
-                  href={`/day/${o.date}`}
+                  href={dayHref(o.date)}
                   className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 no-underline backdrop-blur-md transition-all hover:border-primary/50 hover:bg-accent/40"
                 >
                   <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gold/15 text-gold">

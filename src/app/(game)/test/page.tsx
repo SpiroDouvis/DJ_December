@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dayHref } from "@/lib/calendar";
 import {
   CalendarClock,
   ChevronLeft,
@@ -44,7 +45,7 @@ export default async function TestPage({ searchParams }: { searchParams: Promise
           <CardDescription className="text-base">
             Play a pretend DJ December with fake players and a clock you move yourself. It runs in a separate test
             sandbox, so the real players, songs, ratings, day themes and theme ideas are never touched. While a test
-            round is on, every page (Today, Schedule, Ideas, Stats, Admin) shows the test game, and only for you.
+            round is on, every page (Today, Calendar, Ideas, Stats, Admin) shows the test game, and only for you.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -194,8 +195,8 @@ async function RunningRound() {
             {dayNumber === 0
               ? `It's the night before the test season. Day 1 is ${formatDate(game.season.start)}.`
               : `It's ${formatDate(game.today)}, day ${dayNumber} of ${game.season.days}.`}{" "}
-            Moving to the next day is the same as 5 AM MST arriving: the day opens and, on a theme day, its theme is
-            drawn from the test&apos;s ideas.
+            Moving to the next day is the same as 5 AM MST arriving: the day opens with whatever theme you gave it on
+            the calendar.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-2">
@@ -311,7 +312,7 @@ async function RunningRound() {
                   return (
                     <TableRow key={date}>
                       <TableCell>
-                        <Link href={`/day/${date}`} className="text-violet-200 underline hover:text-white">
+                        <Link href={dayHref(date)} className="text-violet-200 underline hover:text-white">
                           {formatDate(date)}
                         </Link>
                       </TableCell>

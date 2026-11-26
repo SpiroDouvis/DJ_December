@@ -1,28 +1,17 @@
 import { randomInt } from "node:crypto";
-import { addDays, type GameDate, type Season } from "./time";
+import type { GameDate } from "./time";
 
 /** An idea in the theme pool. submittedBy is null once its player has been removed. */
 export type ThemeRow = { id: string; text: string; submittedBy: string | null; createdAt: string };
-/** A saved decision for one day. A null text means the day has no theme. */
+/**
+ * A day's theme, which an admin assigns on the calendar. Days without a row have
+ * no theme. A null text also means no theme (older rows can say so explicitly).
+ */
 export type DayThemeRow = { date: GameDate; text: string | null; themeId: string | null };
 
-/** Every second day of the season is themed by default: the 2nd, 4th, 6th and so on. */
-export function isDefaultThemed(season: Season, date: GameDate): boolean {
-  for (let i = 0; i < season.days; i++) {
-    if (addDays(season.start, i) === date) return i % 2 === 1;
-  }
-  return false;
-}
-
-/** Whether a day has a theme, without saying what it is. */
-export function isThemed(season: Season, date: GameDate, saved: Map<GameDate, DayThemeRow>): boolean {
-  const row = saved.get(date);
-  return row ? row.text !== null : isDefaultThemed(season, date);
-}
-
 /**
- * Draws a theme at random, preferring ones no day has used yet. Once every
- * theme has been used, any of them can come up again.
+ * Picks an idea at random, preferring ones no day has used yet. Once every idea
+ * has been used, any of them can come up again.
  */
 export function drawTheme<T extends Pick<ThemeRow, "id" | "text">>(
   pool: T[],
@@ -37,24 +26,12 @@ export function drawTheme<T extends Pick<ThemeRow, "id" | "text">>(
   return from[random(from.length)];
 }
 
-/** Open themed days that haven't had their theme drawn yet. */
-export function datesNeedingDraw(
-  season: Season,
-  open: GameDate[],
-  saved: Map<GameDate, DayThemeRow>,
-): GameDate[] {
-  return open.filter((d) => !saved.has(d) && isDefaultThemed(season, d));
-}
-
-/**
- * The day each pool idea was used on, counting only days that have opened, so
- * an admin's pick for a future day stays secret.
- */
-export function usedOn(open: GameDate[], saved: Map<GameDate, DayThemeRow>): Map<string, GameDate> {
-  const used = new Map<string, GameDate>();
-  for (const d of open) {
-    const id = saved.get(d)?.themeId;
-    if (id && !used.has(id)) used.set(id, d);
+/** The days each pool idea is assigned to, earliest first. */
+export function daysByIdea(saved: Map<GameDate, DayThemeRow>): Map<string, GameDate[]> {
+  const byIdea = new Map<string, GameDate[]>();
+  for (const row of [...saved.values()].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (!row.themeId || row.text === null) continue;
+    byIdea.set(row.themeId, [...(byIdea.get(row.themeId) ?? []), row.date]);
   }
-  return used;
+  return byIdea;
 }

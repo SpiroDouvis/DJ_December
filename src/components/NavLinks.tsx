@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/", label: "Today", icon: Disc3 },
-  { href: "/schedule", label: "Schedule", icon: CalendarDays },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/stats", label: "Stats", icon: ChartColumn },
   { href: "/admin", label: "Admin", icon: Shield, admin: true },
@@ -17,7 +17,7 @@ const LINKS = [
 
 export function NavLinks({ isAdmin, canTest }: { isAdmin: boolean; canTest: boolean }) {
   const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" || path.startsWith("/day/") : path.startsWith(href));
+  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   return (
     <nav className="isolate flex items-center gap-1 rounded-full border bg-background/40 p-1">
       {LINKS.filter((l) => (!l.admin || isAdmin) && (!l.test || canTest)).map(({ href, label, icon: Icon }) => (

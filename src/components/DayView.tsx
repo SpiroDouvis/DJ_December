@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Game, Me } from "@/lib/data";
 import { dayOutcome, shuffledForDisplay, type DayOutcome, type RoundStatus } from "@/lib/game";
-import { availabilityKey } from "@/lib/schedule";
+import { dayHref } from "@/lib/calendar";
 import { formatDate } from "@/lib/time";
 import { Hourglass, Trophy } from "lucide-react";
 import { ResultBanner, RevealRow, RevealRows, Stagger, StaggerItem, ThemeReveal } from "./motion";
@@ -29,20 +29,11 @@ export function ThemeLine({ theme }: { theme?: string }) {
 }
 
 /** Who the round is waiting on. Public on purpose: slacking should be seen. */
-export function WaitingOn({ status, game }: { status: RoundStatus; game: Game }) {
+export function WaitingOn({ status }: { status: RoundStatus }) {
   if (status.revealed) return null;
-  // What each player said about today on the schedule tab, if anything.
-  const today = (id: string) => {
-    const a = game.availability.get(availabilityKey(id, game.today));
-    if (!a) return "";
-    return `${a.status === "busy" ? "busy today" : "free today"}${a.note ? `: ${a.note}` : ""}`;
-  };
-  const songs = status.missingSongs.map((p) => (today(p.id) ? `${p.name} (${today(p.id)})` : p.name));
+  const songs = status.missingSongs.map((p) => p.name);
   const raters = status.ratingsLeft.map(
-    (x) =>
-      `${x.player.name} (${[`${x.count} ${x.count === 1 ? "rating" : "ratings"}`, today(x.player.id)]
-        .filter(Boolean)
-        .join(", ")})`,
+    (x) => `${x.player.name} (${x.count} ${x.count === 1 ? "rating" : "ratings"})`,
   );
   return (
     <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
@@ -68,7 +59,7 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
     <Card>
       <CardHeader>
         <CardTitle>
-          <Link href={`/day/${status.date}`} className="no-underline hover:text-violet-200">
+          <Link href={dayHref(status.date)} scroll={false} className="no-underline hover:text-violet-200">
             {title(status)}
           </Link>
         </CardTitle>
@@ -84,7 +75,7 @@ export function OpenRound({ game, me, status }: { game: Game; me: Me; status: Ro
               )} ${status.raters.length === 1 ? "rates" : "rate"} them.`}
         </p>
       ) : null}
-      <WaitingOn status={status} game={game} />
+      <WaitingOn status={status} />
       {others.length === 0 ? <p className="text-sm text-muted-foreground">No songs to rate yet.</p> : null}
       <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {others.map((s, i) => {
